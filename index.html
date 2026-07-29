@@ -1,6 +1,413 @@
 <!DOCTYPE html>
-<html>
-  <head><title>Baby Feeding</title></head>
-<body><h1>Baby Feeding Tracker</h1></body>
-</html></h1></body></title></head>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="喂养记录">
+<link rel="manifest" href="./manifest.json">
+<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect fill='%23FF9AA2' width='192' height='192' rx='32'/><text x='96' y='120' font-size='100' text-anchor='middle' fill='white'>🍼</text></svg>">
+<title>宝宝喂养记录</title>
+<style>
+:root {
+  --pink: #FF9AA2;
+  --pink-light: #FFB7B2;
+  --peach: #FFDAC1;
+  --mint: #B5EAD7;
+  --blue-light: #C7CEEA;
+  --bg: #FFF5F5;
+  --card: #FFFFFF;
+  --text: #4A4A4A;
+  --text-light: #888888;
+  --border: #F0E8E8;
+  --shadow: 0 2px 12px rgba(255,154,162,0.12);
+  --radius: 16px;
+  --radius-sm: 10px;
+  --nav-height: 64px;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  -webkit-tap-highlight-color: transparent;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+  overflow-x: hidden;
+}
+.app-container {
+  max-width: 480px;
+  margin: 0 auto;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  padding-bottom: calc(var(--nav-height) + var(--safe-bottom) + 8px);
+}
+/* Page */
+.page { display:none; flex:1; padding: 12px 14px; }
+.page.active { display:block; }
+/* Header */
+.header {
+  display:flex; align-items:center; justify-content:space-between;
+  padding: 16px 14px 12px;
+  position:sticky; top:0; background:var(--bg); z-index:10;
+}
+.header h1 { font-size:22px; font-weight:700; color:var(--pink); }
+.header .baby-emoji { width:42px; height:42px; border-radius:50%; object-fit:cover; cursor:default; }
+/* Toast */
+.toast-container {
+  position:fixed; top:20px; left:50%; transform:translateX(-50%);
+  z-index:9999; display:flex; flex-direction:column; gap:8px;
+  pointer-events:none; max-width:90%;
+}
+.toast {
+  background:rgba(74,74,74,0.92); color:#fff; padding:10px 20px;
+  border-radius:20px; font-size:14px; text-align:center;
+  animation: toastIn 0.3s ease-out, toastOut 0.3s 2s ease-in forwards;
+  pointer-events:auto; white-space:nowrap;
+}
+.toast.success { background:rgba(181,234,215,0.95); color:#2d6a4f; }
+.toast.warning { background:rgba(255,218,193,0.95); color:#ad6200; }
+@keyframes toastIn { from{opacity:0;transform:translateY(-16px)} to{opacity:1;transform:translateY(0)} }
+@keyframes toastOut { from{opacity:1} to{opacity:0;transform:translateY(-16px)} }
+/* Card */
+.card {
+  background:var(--card); border-radius:var(--radius); padding:16px;
+  box-shadow:var(--shadow); margin-bottom:12px;
+}
+.card-title { font-size:15px; font-weight:600; margin-bottom:12px; color:var(--text); }
+/* Dashboard */
+.dash-summary { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:12px; }
+.dash-item {
+  background:var(--card); border-radius:var(--radius-sm); padding:14px 10px;
+  text-align:center; box-shadow:var(--shadow);
+}
+.dash-item .value { font-size:26px; font-weight:700; color:var(--pink); }
+.dash-item .label { font-size:12px; color:var(--text-light); margin-top:4px; }
+.dash-item .unit { font-size:13px; font-weight:400; color:var(--text-light); }
+.timer-card {
+  background:linear-gradient(135deg, var(--pink-light), var(--peach));
+  border-radius:var(--radius); padding:16px; margin-bottom:12px; text-align:center; color:#fff;
+}
+.timer-card .timer-label { font-size:13px; opacity:0.9; }
+.timer-card .timer-value { font-size:36px; font-weight:700; margin:6px 0; }
+.timer-card .timer-detail { font-size:13px; opacity:0.85; }
+/* Recent record card */
+.record-card {
+  background: var(--card); border-radius: var(--radius-sm); padding: 14px;
+  margin-bottom: 10px; box-shadow: 0 1px 6px rgba(0,0,0,0.05);
+  position: relative; display: flex; gap: 12px;
+}
+.record-card:last-child { margin-bottom: 0; }
+.record-card .rc-icon-wrap {
+  width: 40px; height: 40px; border-radius: 12px; display: flex;
+  align-items: center; justify-content: center; font-size: 22px;
+  background: var(--bg); flex-shrink: 0;
+}
+.record-card .rc-body { flex: 1; min-width: 0; }
+.record-card .rc-type {
+  font-size: 11px; color: var(--pink); font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px;
+}
+.record-card .rc-detail { font-size: 16px; font-weight: 600; color: var(--text); line-height: 1.3; }
+.record-card .rc-meta { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+.record-card .rc-time { font-size: 12px; color: var(--text-light); }
+.record-card .rc-ago { font-size: 12px; color: var(--pink); font-weight: 500; }
+.rc-delete-btn {
+  position: absolute; top: 8px; right: 10px;
+  width: 26px; height: 26px; border-radius: 50%; border: none;
+  background: transparent; color: #ccc; font-size: 16px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.15s; line-height: 1;
+}
+.rc-delete-btn:hover, .rc-delete-btn:active { color: #e74c3c; background: #FFF0F0; }
+/* Timeline delete */
+.tl-delete-btn {
+  width: 28px; height: 28px; border-radius: 50%; border: none;
+  background: transparent; color: #ccc; font-size: 15px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.15s; flex-shrink: 0;
+}
+.tl-delete-btn:active { color: #e74c3c; background: #FFF0F0; }
+/* Datetime input */
+.datetime-row {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 8px;
+  padding: 6px 0; border-bottom: 1px dashed var(--border);
+}
+.datetime-row .dt-label { font-size: 12px; color: var(--text-light); white-space: nowrap; }
+.datetime-row input[type="datetime-local"] {
+  flex: 1; padding: 8px 10px; border: 2px solid var(--border);
+  border-radius: var(--radius-sm); font-size: 13px; outline: none;
+  background: var(--card); color: var(--text);
+}
+.datetime-row input[type="datetime-local"]:focus { border-color: var(--pink); }
+/* Quick Entry */
+.tab-bar { display:flex; gap:6px; margin-bottom:12px; }
+.tab-btn {
+  flex:1; padding:10px 6px; border:none; border-radius:20px; font-size:13px;
+  background:#f5f5f5; color:var(--text); cursor:pointer; transition:all 0.2s;
+  font-weight:500;
+}
+.tab-btn.active { background:var(--pink); color:#fff; box-shadow:0 2px 8px rgba(255,154,162,0.4); }
+.preset-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:10px; }
+.preset-btn {
+  padding:14px 8px; border:2px solid var(--border); border-radius:var(--radius-sm);
+  background:var(--card); font-size:15px; font-weight:600; color:var(--text);
+  cursor:pointer; transition:all 0.15s; text-align:center;
+}
+.preset-btn:active { border-color:var(--pink); background:var(--bg); transform:scale(0.96); }
+.preset-btn.selected { border-color:var(--pink); background:#FFF0F0; color:var(--pink); }
+.entry-row { display:flex; gap:8px; align-items:center; margin-bottom:8px; }
+.entry-row input {
+  flex:1; padding:12px; border:2px solid var(--border); border-radius:var(--radius-sm);
+  font-size:15px; outline:none; background:var(--card); color:var(--text);
+}
+.entry-row input:focus { border-color:var(--pink); }
+.portion-bar { display:flex; gap:8px; }
+.portion-btn {
+  flex:1; padding:10px; border:2px solid var(--border); border-radius:20px;
+  background:var(--card); font-size:13px; text-align:center; cursor:pointer;
+  transition:all 0.15s;
+}
+.portion-btn:active, .portion-btn.selected { border-color:var(--pink); background:#FFF0F0; color:var(--pink); }
+.btn-primary {
+  width:100%; padding:14px; background:var(--pink); color:#fff; border:none;
+  border-radius:28px; font-size:17px; font-weight:600; cursor:pointer;
+  box-shadow:0 4px 14px rgba(255,154,162,0.4); transition:all 0.15s; margin-top:4px;
+}
+.btn-primary:active { transform:scale(0.97); opacity:0.9; }
+.btn-primary:disabled { opacity:0.5; transform:none; }
+/* H/W section */
+.hw-row { display:flex; gap:10px; }
+.hw-row .input-group { flex:1; }
+.hw-row .input-group label { display:block; font-size:12px; color:var(--text-light); margin-bottom:4px; }
+.hw-row .input-group input {
+  width:100%; padding:12px; border:2px solid var(--border); border-radius:var(--radius-sm);
+  font-size:16px; text-align:center; outline:none; background:var(--card);
+}
+.hw-row .input-group input:focus { border-color:var(--pink); }
+.bmi-display { text-align:center; padding:10px; margin-top:8px; font-size:14px; color:var(--pink); font-weight:600; }
+/* Timeline */
+.date-group { margin-bottom:16px; }
+.date-label { font-size:13px; font-weight:600; color:var(--text-light); margin-bottom:8px; padding-left:4px; }
+.tl-item {
+  display:flex; align-items:center; gap:10px; padding:12px;
+  background:var(--card); border-radius:var(--radius-sm); margin-bottom:6px;
+  box-shadow:0 1px 4px rgba(0,0,0,0.04);
+}
+.tl-icon { font-size:22px; min-width:32px; text-align:center; }
+.tl-content { flex:1; }
+.tl-title { font-size:14px; font-weight:500; }
+.tl-time { font-size:11px; color:var(--text-light); }
+.tl-ago { font-size:12px; color:var(--pink); white-space:nowrap; }
+/* Stats */
+.chart-container { background:var(--card); border-radius:var(--radius); padding:16px; margin-bottom:12px; box-shadow:var(--shadow); }
+.chart-title { font-size:15px; font-weight:600; margin-bottom:12px; }
+.chart-canvas-wrap { overflow-x:auto; }
+.chart-canvas-wrap canvas { display:block; }
+.stat-empty { text-align:center; padding:40px 20px; color:var(--text-light); font-size:14px; }
+/* Settings */
+.setting-item {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:14px 0; border-bottom:1px solid var(--border);
+}
+.setting-item .label { font-size:15px; }
+.setting-item .hint { font-size:12px; color:var(--text-light); }
+.toggle { position:relative; display:inline-block; width:48px; height:28px; min-width:48px; }
+.toggle input { opacity:0; width:0; height:0; }
+.toggle .slider {
+  position:absolute; top:0;left:0;right:0;bottom:0; background:#ddd; border-radius:28px;
+  cursor:pointer; transition:0.2s;
+}
+.toggle .slider:before {
+  content:''; position:absolute; height:22px;width:22px; left:3px;bottom:3px;
+  background:#fff; border-radius:50%; transition:0.2s;
+}
+.toggle input:checked+.slider { background:var(--pink); }
+.toggle input:checked+.slider:before { transform:translateX(20px); }
+.setting-row { display:flex; gap:8px; margin-top:8px; }
+.setting-row button {
+  flex:1; padding:10px; border:2px solid var(--border); border-radius:var(--radius-sm);
+  background:var(--card); font-size:13px; cursor:pointer; color:var(--text);
+  transition:all 0.15s;
+}
+.setting-row button:active { border-color:var(--pink); }
+.btn-danger {
+  width:100%; margin-top:16px; padding:14px; border:2px solid #e74c3c; background:var(--card);
+  color:#e74c3c; border-radius:28px; font-size:15px; cursor:pointer; font-weight:600;
+}
+.btn-danger:active { background:#FFF0F0; }
+/* Interval Select */
+.interval-select {
+  padding:8px 12px; border:2px solid var(--border); border-radius:20px;
+  font-size:14px; outline:none; background:var(--card); color:var(--text);
+}
+/* Nav */
+.bottom-nav {
+  position:fixed; bottom:0; left:50%; transform:translateX(-50%);
+  max-width:480px; width:100%; display:flex; background:var(--card);
+  border-top:1px solid var(--border); z-index:100;
+  padding-bottom:var(--safe-bottom);
+  box-shadow:0 -2px 12px rgba(0,0,0,0.04);
+}
+.nav-item {
+  flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center;
+  padding:8px 0 6px; cursor:pointer; transition:color 0.2s; color:var(--text-light);
+  gap:3px;
+}
+.nav-item.active { color:var(--pink); }
+.nav-item .icon { font-size:22px; }
+.nav-item .text { font-size:11px; font-weight:500; }
+/* Notification toast with sound */
+.notif-toast {
+  position:fixed; top:50%; left:50%; transform:translate(-50%,-50%);
+  background:var(--card); border-radius:var(--radius); padding:24px 32px;
+  box-shadow:0 8px 32px rgba(0,0,0,0.18); z-index:10000; text-align:center;
+  animation:notifIn 0.4s ease-out;
+  display:none;
+}
+.notif-toast.show { display:block; }
+.notif-toast .notif-emoji { font-size:48px; }
+.notif-toast .notif-msg { font-size:16px; margin-top:8px; font-weight:500; }
+.notif-toast .notif-close {
+  margin-top:12px; padding:8px 28px; background:var(--pink); color:#fff;
+  border:none; border-radius:20px; font-size:14px; cursor:pointer;
+}
+@keyframes notifIn { from{opacity:0;transform:translate(-50%,-50%) scale(0.8)} to{opacity:1;transform:translate(-50%,-50%) scale(1)} }
+/* Back button */
+.back-btn { font-size:14px; color:var(--pink); cursor:pointer; font-weight:500; background:none; border:none; }
+/* baby name modal */
+.modal-overlay {
+  position:fixed; inset:0; background:rgba(0,0,0,0.4); z-index:9998;
+  display:flex; align-items:center; justify-content:center; display:none;
+}
+.modal-overlay.show { display:flex; }
+.modal-box {
+  background:var(--card); border-radius:var(--radius); padding:24px;
+  width:85%; max-width:360px; box-shadow:0 8px 32px rgba(0,0,0,0.2);
+}
+.modal-box h3 { font-size:17px; margin-bottom:12px; }
+.modal-box input {
+  width:100%; padding:12px; border:2px solid var(--border); border-radius:var(--radius-sm);
+  font-size:15px; outline:none; margin-bottom:12px;
+}
+.modal-box input:focus { border-color:var(--pink); }
+.modal-box .btn-row { display:flex; gap:8px; }
+.modal-box .btn-row button { flex:1; padding:10px; border-radius:20px; font-size:14px; cursor:pointer; border:none; }
+.modal-box .btn-cancel { background:#f5f5f5; color:var(--text); }
+.modal-box .btn-confirm { background:var(--pink); color:#fff; }
+</style>
+</head>
+<body>
+
+<div class="toast-container" id="toastContainer"></div>
+<div class="notif-toast" id="notifToast">
+  <div class="notif-emoji">⏰</div>
+  <div class="notif-msg" id="notifMsg"></div>
+  <button class="notif-close" onclick="closeNotif()">知道了</button>
+</div>
+<div class="app-container" id="appContainer">
+
+  <div class="header">
+    <h1 id="headerTitle">杨一舟的喂养记录</h1>
+    <img class="baby-emoji" src="baby_avatar.jpg" alt="宝宝头像">
+  </div>
+
+  <!-- Page: Dashboard -->
+  <div class="page active" id="page-dashboard">
+    <div class="dash-summary" id="dashSummary"></div>
+    <div class="timer-card" id="timerCard"></div>
+    <div class="card">
+      <div class="card-title">最近记录</div>
+      <div id="recentList"></div>
+    </div>
+  </div>
+
+  <!-- Page: Entry -->
+  <div class="page" id="page-entry">
+    <div class="tab-bar" id="entryTabs"></div>
+    <div id="entryContent"></div>
+  </div>
+
+  <!-- Page: Timeline -->
+  <div class="page" id="page-timeline">
+    <div id="timelineContent"></div>
+  </div>
+
+  <!-- Page: Stats -->
+  <div class="page" id="page-stats">
+    <div id="statsContent"></div>
+  </div>
+
+  <!-- Page: Settings -->
+  <div class="page" id="page-settings">
+    <div class="card">
+      <div class="setting-item">
+        <div>
+          <div class="label">喂养提醒</div>
+          <div class="hint" id="notifStatus">未开启</div>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" id="notifToggle" onchange="toggleNotification()">
+          <span class="slider"></span>
+        </label>
+      </div>
+      <div class="setting-item">
+        <div class="label">提醒间隔</div>
+        <select class="interval-select" id="intervalSelect" onchange="updateInterval()">
+          <option value="120">2 小时</option>
+          <option value="180">3 小时</option>
+          <option value="240" selected>4 小时</option>
+        </select>
+      </div>
+      <div style="padding-top:12px">
+        <div class="label" style="margin-bottom:4px;font-size:12px;color:var(--text-light)">此间隔内宝宝未进食则推送提醒</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">数据导出</div>
+      <div class="setting-row">
+        <button onclick="exportAll()">导出全部</button>
+        <button onclick="exportLast7()">导出近7天</button>
+        <button onclick="exportLast30()">导出近30天</button>
+      </div>
+    </div>
+    <button class="btn-danger" onclick="clearAllData()">清空所有数据</button>
+    <div style="text-align:center;padding:16px;font-size:12px;color:var(--text-light)">
+      宝宝喂养记录 v3.0 · 数据云端同步 (Supabase)
+    </div>
+  </div>
+
+  <!-- Bottom Nav -->
+  <nav class="bottom-nav" id="bottomNav">
+    <div class="nav-item active" data-page="dashboard">
+      <div class="icon">🏠</div>
+      <div class="text">首页</div>
+    </div>
+    <div class="nav-item" data-page="entry">
+      <div class="icon">✏️</div>
+      <div class="text">录入</div>
+    </div>
+    <div class="nav-item" data-page="timeline">
+      <div class="icon">📋</div>
+      <div class="text">时间线</div>
+    </div>
+    <div class="nav-item" data-page="stats">
+      <div class="icon">📊</div>
+      <div class="text">统计</div>
+    </div>
+    <div class="nav-item" data-page="settings">
+      <div class="icon">⚙️</div>
+      <div class="text">设置</div>
+    </div>
+  </nav>
+
+</div>
+
+<script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="./app.js"></script>
+</body>
 </html>
