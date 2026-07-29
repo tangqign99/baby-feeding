@@ -1,5 +1,5 @@
 /* ============================================
-   宝宝喂养记录 PWA - 应用逻辑 v3 (Supabase)
+   宝宝喂养记录 PWA - 应用逻辑 v3.1 (Supabase)
    ============================================ */
 
 // ------- Supabase -------
@@ -55,11 +55,20 @@ async function loadRecords() {
             }
           }
           if (toUpload.length > 0) {
-            await supabase.from('feeding_records').insert(toUpload);
-            data = (data || []).concat(toUpload);
+            // 去掉本地 id，timestamp 转为 ISO 字符串
+            var cleanUpload = toUpload.map(function(r) {
+              var clean = {};
+              for (var k in r) { if (k !== 'id') clean[k] = r[k]; }
+              if (typeof clean.timestamp === 'number') clean.timestamp = new Date(clean.timestamp).toISOString();
+              return clean;
+            });
+            var { data: inserted, error: migErr } = await supabase.from('feeding_records').insert(cleanUpload).select();
+            if (migErr) throw migErr;
+            if (inserted) data = (data || []).concat(inserted);
+            toast('已从本地上传 ' + inserted.length + ' 条历史记录', 'success');
           }
         }
-      } catch (e) { /* migration failed, continue */ }
+      } catch (e) { toast('本地数据迁移失败: ' + e.message, 'warning'); }
       localStorage.removeItem(STORAGE_KEY);
     }
 
@@ -72,10 +81,23 @@ async function loadRecords() {
 }
 
 async function saveRecord(record) {
+  // 去掉本地 id，让 Supabase BIGSERIAL 自动生成
+  var cleanRecord = {};
+  for (var key in record) {
+    if (key !== 'id') cleanRecord[key] = record[key];
+  }
+  // timestamp 转为 ISO 字符串以匹配 TIMESTAMPTZ 列
+  if (typeof cleanRecord.timestamp === 'number') {
+    cleanRecord.timestamp = new Date(cleanRecord.timestamp).toISOString();
+  }
   try {
-    var { error } = await supabase.from('feeding_records').insert(record);
+    var { data, error } = await supabase.from('feeding_records').insert(cleanRecord).select();
     if (error) throw error;
-    cachedRecords.unshift(record);
+    if (data && data.length > 0) {
+      cachedRecords.unshift(data[0]);
+    } else {
+      cachedRecords.unshift(cleanRecord);
+    }
   } catch (e) {
     toast('保存失败: ' + e.message, 'warning');
     throw e;
@@ -526,7 +548,6 @@ async function recordMilk() {
   var note = noteEl ? noteEl.value.trim() : '';
 
   var record = {
-    id: genId(),
     type: 'milk',
     amount: amount,
     unit: 'ml',
@@ -553,7 +574,6 @@ async function recordMeal() {
   var note = noteEl ? noteEl.value.trim() : '';
 
   var record = {
-    id: genId(),
     type: 'meal',
     subtype: subtype,
     portion: selectedPortion || undefined,
@@ -580,7 +600,6 @@ async function recordSnack() {
   var note = noteEl ? noteEl.value.trim() : '';
 
   var record = {
-    id: genId(),
     type: 'snack',
     subtype: subtype,
     portion: selectedPortion || undefined,
@@ -604,7 +623,6 @@ async function recordHeight() {
   if (isNaN(height) || height <= 0) { toast('请输入有效身高', 'warning'); return; }
 
   var record = {
-    id: genId(),
     type: 'height',
     height: height,
     timestamp: getEntryTimestamp()
@@ -625,7 +643,6 @@ async function recordWeight() {
   if (isNaN(weight) || weight <= 0) { toast('请输入有效体重', 'warning'); return; }
 
   var record = {
-    id: genId(),
     type: 'weight',
     weight: weight,
     timestamp: getEntryTimestamp()
