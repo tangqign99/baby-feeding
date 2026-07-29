@@ -1,5 +1,5 @@
 /* ============================================
-   宝宝喂养记录 PWA - 应用逻辑 v3.1 (Supabase)
+   宝宝喂养记录 PWA - 应用逻辑 v3.2 (Supabase)
    ============================================ */
 
 // ------- Supabase -------
@@ -72,12 +72,22 @@ async function loadRecords() {
       localStorage.removeItem(STORAGE_KEY);
     }
 
-    cachedRecords = data || [];
+    cachedRecords = normalizeTimestamps(data || []);
   } catch (e) {
     toast('数据加载失败: ' + e.message, 'warning');
     cachedRecords = [];
   }
   showLoading(false);
+}
+
+// Supabase 返回的 timestamp 是 ISO 字符串，前端排序/时间差需要用数字
+function normalizeTimestamps(records) {
+  for (var i = 0; i < records.length; i++) {
+    if (typeof records[i].timestamp === 'string') {
+      records[i].timestamp = new Date(records[i].timestamp).getTime();
+    }
+  }
+  return records;
 }
 
 async function saveRecord(record) {
@@ -94,6 +104,7 @@ async function saveRecord(record) {
     var { data, error } = await supabase.from('feeding_records').insert(cleanRecord).select();
     if (error) throw error;
     if (data && data.length > 0) {
+      normalizeTimestamps(data);
       cachedRecords.unshift(data[0]);
     } else {
       cachedRecords.unshift(cleanRecord);
@@ -113,6 +124,9 @@ function subscribeRealtime() {
       { event: 'INSERT', schema: 'public', table: 'feeding_records' },
       function(payload) {
         var newRecord = payload.new;
+        if (typeof newRecord.timestamp === 'string') {
+          newRecord.timestamp = new Date(newRecord.timestamp).getTime();
+        }
         var exists = cachedRecords.some(function(r) { return r.id === newRecord.id; });
         if (!exists) {
           cachedRecords.unshift(newRecord);
