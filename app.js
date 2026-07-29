@@ -39,17 +39,24 @@ async function loadRecords() {
 
     if (error) throw error;
 
-    // Migrate old localStorage data if any
+    // Force-sync local data to Supabase (dedup by timestamp+type)
     var legacyRaw = localStorage.getItem(STORAGE_KEY);
     if (legacyRaw) {
       try {
         var legacy = JSON.parse(legacyRaw);
         if (legacy.length > 0) {
-          var existingIds = new Set(data ? data.map(function(r) { return r.id; }) : []);
-          var newRecords = legacy.filter(function(r) { return !existingIds.has(r.id); });
-          if (newRecords.length > 0) {
-            await supabase.from('feeding_records').insert(newRecords);
-            data = (data || []).concat(newRecords);
+          var existingKeys = new Set((data || []).map(function(r) { return r.timestamp + '|' + r.type; }));
+          var toUpload = [];
+          for (var i = 0; i < legacy.length; i++) {
+            var key = legacy[i].timestamp + '|' + legacy[i].type;
+            if (!existingKeys.has(key)) {
+              toUpload.push(legacy[i]);
+              existingKeys.add(key);
+            }
+          }
+          if (toUpload.length > 0) {
+            await supabase.from('feeding_records').insert(toUpload);
+            data = (data || []).concat(toUpload);
           }
         }
       } catch (e) { /* migration failed, continue */ }
@@ -384,7 +391,7 @@ function renderEntryContent() {
   switch (entryTab) {
     case 'milk':
       container.innerHTML =
-        '<div class="preset-grid" id="presetGrid"></div>' +
+        '<div class="preset-grid-milk" id="presetGrid"></div>' +
         '<div class="entry-row">' +
         '<input type="number" id="customAmount" placeholder="自定义ml数" inputmode="numeric" min="1" max="9999">' +
         '</div>' +

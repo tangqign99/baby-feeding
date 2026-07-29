@@ -79,14 +79,14 @@ body {
 }
 .card-title { font-size:15px; font-weight:600; margin-bottom:12px; color:var(--text); }
 /* Dashboard */
-.dash-summary { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:12px; }
+.dash-summary { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-bottom:16px; }
 .dash-item {
-  background:var(--card); border-radius:var(--radius-sm); padding:14px 10px;
+  background:var(--card); border-radius:var(--radius-sm); padding:18px 14px;
   text-align:center; box-shadow:var(--shadow);
 }
-.dash-item .value { font-size:26px; font-weight:700; color:var(--pink); }
-.dash-item .label { font-size:12px; color:var(--text-light); margin-top:4px; }
-.dash-item .unit { font-size:13px; font-weight:400; color:var(--text-light); }
+.dash-item .value { font-size:38px; font-weight:700; color:var(--pink); }
+.dash-item .label { font-size:14px; color:var(--text-light); margin-top:6px; }
+.dash-item .unit { font-size:16px; font-weight:400; color:var(--text-light); }
 .timer-card {
   background:linear-gradient(135deg, var(--pink-light), var(--peach));
   border-radius:var(--radius); padding:16px; margin-bottom:12px; text-align:center; color:#fff;
@@ -151,11 +151,15 @@ body {
   font-weight:500;
 }
 .tab-btn.active { background:var(--pink); color:#fff; box-shadow:0 2px 8px rgba(255,154,162,0.4); }
+.preset-grid-milk { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin-bottom:10px; }
 .preset-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:10px; }
 .preset-btn {
   padding:14px 8px; border:2px solid var(--border); border-radius:var(--radius-sm);
   background:var(--card); font-size:15px; font-weight:600; color:var(--text);
   cursor:pointer; transition:all 0.15s; text-align:center;
+}
+.preset-grid-milk .preset-btn {
+  padding:18px 14px; font-size:17px;
 }
 .preset-btn:active { border-color:var(--pink); background:var(--bg); transform:scale(0.96); }
 .preset-btn.selected { border-color:var(--pink); background:#FFF0F0; color:var(--pink); }
