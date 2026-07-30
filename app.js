@@ -1,5 +1,5 @@
 /* ============================================
-   宝宝喂养记录 PWA - 应用逻辑 v3.3 (Supabase)
+   宝宝喂养记录 PWA - 应用逻辑 v3.4 (Supabase)
    ============================================ */
 
 // ------- Supabase -------
@@ -115,7 +115,7 @@ async function saveRecord(record) {
     } else {
       cachedRecords.unshift(cleanRecord);
     }
-    toast('已保存（共 ' + cachedRecords.length + ' 条）', 'success');
+    toast('保存成功', 'success');
   } catch (e) {
     toast('保存失败: ' + e.message, 'warning');
     throw e;
@@ -314,13 +314,6 @@ function renderDashboard() {
   var settings = getSettings();
   document.getElementById('headerTitle').textContent = settings.babyName + '的喂养记录';
   
-  // 显示记录总数
-  var rcEl = document.getElementById('recordCount');
-  if (rcEl) {
-    rcEl.textContent = '共 ' + records.length + ' 条记录';
-    rcEl.style.display = 'block';
-  }
-
   // Summary: today
   var today = formatDate(Date.now());
   var todayRecords = records.filter(function(r) { return formatDate(r.timestamp) === today; });

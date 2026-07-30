@@ -321,7 +321,6 @@ body {
 
   <!-- Page: Dashboard -->
   <div class="page active" id="page-dashboard">
-    <div id="recordCount" style="display:none;text-align:center;padding:8px;font-size:13px;color:var(--primary);font-weight:600;background:var(--primary-bg);border-radius:8px;margin-bottom:12px;"></div>
     <div class="dash-summary" id="dashSummary"></div>
     <div class="timer-card" id="timerCard"></div>
     <div class="card">
@@ -381,7 +380,7 @@ body {
     </div>
     <button class="btn-danger" onclick="clearAllData()">清空所有数据</button>
     <div style="text-align:center;padding:16px;font-size:12px;color:var(--text-light)">
-      宝宝喂养记录 v3.3 · 数据云端同步 (Supabase)
+      宝宝喂养记录 v3.4 · 数据云端同步 (Supabase)
     </div>
   </div>
 
@@ -413,11 +412,11 @@ body {
 
 <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-  <script src="./app.js?v=3.3"></script>
+  <script src="./app.js?v=3.4"></script>
   <script>
     // Service Worker 注册
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('./sw.js?v=3.3').then(function(reg) {
+      navigator.serviceWorker.register('./sw.js?v=3.4').then(function(reg) {
         console.log('SW registered:', reg.scope);
       }).catch(function(err) {
         console.log('SW failed:', err);
