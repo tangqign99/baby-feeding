@@ -1,5 +1,5 @@
 /* ============================================
-   宝宝喂养记录 PWA - 应用逻辑 v3.8 (Supabase)
+   宝宝喂养记录 PWA - 应用逻辑 v3.9 (Supabase)
    ============================================ */
 
 // ------- Supabase -------
@@ -1002,6 +1002,38 @@ function renderStats() {
     html += '<div class="stat-empty">暂无身高体重数据</div>';
   }
   html += '</div>';
+
+  // Sleep records section
+  var sleepRecords = records.filter(function(r) { return r.type === 'sleep'; }).sort(function(a, b) { return b.timestamp - a.timestamp; });
+  if (sleepRecords.length > 0) {
+    html += '<div class="chart-container"><div class="chart-title">睡眠记录</div>';
+    html += '<div style="overflow-x:auto"><table style="width:100%;font-size:12px;border-collapse:collapse;min-width:360px">';
+    html += '<thead><tr style="border-bottom:2px solid #F0E8E8;text-align:left;color:var(--text-light);font-size:11px"><th style="padding:8px 4px">日期</th><th style="padding:8px 4px">入睡</th><th style="padding:8px 4px">醒来</th><th style="padding:8px 4px">时长</th><th style="padding:8px 4px">类型</th></tr></thead><tbody>';
+    sleepRecords.forEach(function(r) {
+      var startTs = r.sleep_start || r.timestamp;
+      var endTs = r.sleep_end;
+      var dur = (endTs && startTs && endTs > startTs) ? (endTs - startTs) : 0;
+      var sh = Math.floor(dur / 3600000);
+      var sm = Math.floor((dur % 3600000) / 60000);
+
+      var startDate = new Date(startTs);
+      var startHour = startDate.getHours();
+      var isNight = (startHour >= 20 || startHour < 6);
+      var typeTag = isNight ? '夜间' : '白天';
+      var tagColor = isNight ? '#7B68EE' : '#FF8C00';
+
+      html += '<tr style="border-bottom:1px solid var(--border)">' +
+        '<td style="padding:8px 4px;white-space:nowrap">' + formatDate(startTs) + '</td>' +
+        '<td style="padding:8px 4px;white-space:nowrap">' + formatTime(startTs) + '</td>' +
+        '<td style="padding:8px 4px;white-space:nowrap">' + (endTs ? formatTime(endTs) : '--') + '</td>' +
+        '<td style="padding:8px 4px;white-space:nowrap;font-weight:500">' + (dur > 0 ? sh + 'h' + sm + 'm' : '--') + '</td>' +
+        '<td style="padding:8px 4px"><span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600;background:' + tagColor + '18;color:' + tagColor + '">' + typeTag + '</span></td>' +
+        '</tr>';
+    });
+    html += '</tbody></table></div></div>';
+  } else {
+    html += '<div class="chart-container"><div class="chart-title">睡眠记录</div><div class="stat-empty">暂无睡眠数据</div></div>';
+  }
 
   container.innerHTML = html;
 

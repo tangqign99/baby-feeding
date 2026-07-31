@@ -267,10 +267,13 @@ body {
 }
 .setting-row button:active { border-color:var(--pink); }
 .btn-danger {
-  width:100%; margin-top:16px; padding:14px; border:2px solid #e74c3c; background:var(--card);
-  color:#e74c3c; border-radius:28px; font-size:15px; cursor:pointer; font-weight:600;
+  display:block; margin:16px auto 0; max-width:140px; padding:8px 16px;
+  border:1.5px solid #e74c3c; background:var(--card);
+  color:#e74c3c; border-radius:20px; font-size:13px; cursor:pointer; font-weight:500;
+  text-align:center;
 }
 .btn-danger:active { background:#FFF0F0; }
+.btn-danger-hint { text-align:center; font-size:11px; color:var(--text-light); margin-top:8px; }
 /* Interval Select */
 .interval-select {
   padding:8px 12px; border:2px solid var(--border); border-radius:20px;
@@ -359,7 +362,7 @@ body {
 
   <!-- Page: Entry -->
   <div class="page" id="page-entry">
-    <div class="tab-bar" id="entryTabs"></div>
+    <div id="entryTabs"></div>
     <div id="entryContent"></div>
   </div>
 
@@ -406,9 +409,10 @@ body {
         <button onclick="exportLast30()">导出近30天</button>
       </div>
     </div>
+    <div class="btn-danger-hint">清空后不可恢复，请谨慎操作</div>
     <button class="btn-danger" onclick="clearAllData()">清空所有数据</button>
     <div style="text-align:center;padding:16px;font-size:12px;color:var(--text-light)">
-      宝宝喂养记录 v3.8 · 数据云端同步 (Supabase)
+      宝宝喂养记录 v3.9 · 数据云端同步 (Supabase)
     </div>
   </div>
 
@@ -440,11 +444,11 @@ body {
 
 <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-  <script src="./app.js?v=3.8"></script>
+  <script src="./app.js?v=3.9"></script>
   <script>
     // Service Worker 注册
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('./sw.js?v=3.8').then(function(reg) {
+      navigator.serviceWorker.register('./sw.js?v=3.9').then(function(reg) {
         console.log('SW registered:', reg.scope);
       }).catch(function(err) {
         console.log('SW failed:', err);
