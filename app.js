@@ -382,11 +382,13 @@ function renderDashboard() {
   var sleepStr = sleepCount > 0 ? Math.floor(totalSleepMin / 60) + 'h' + (totalSleepMin % 60) + 'm' : '--';
 
   document.getElementById('dashSummary').innerHTML =
-    '<div class="dash-item"><div class="value">' + totalMilk + '<span class="unit">ml</span></div><div class="label">今日奶量</div></div>' +
-    '<div class="dash-item"><div class="value">' + mealCount + '</div><div class="label">吃饭次数</div></div>' +
-    '<div class="dash-item"><div class="value">' + sleepStr + '</div><div class="label">今日睡眠</div></div>' +
-    '<div class="dash-item"><div class="value">' + poopCount + '</div><div class="label">今日大便</div></div>' +
-    '<div class="dash-item"><div class="value">' + diaperCount + '</div><div class="label">今日尿布</div></div>';
+    '<div class="dash-milk-hero"><div class="hero-value">' + totalMilk + '<span class="unit">ml</span></div><div class="label">今日奶量</div></div>' +
+    '<div class="dash-sub-row">' +
+    '<div class="dash-item"><div class="value">' + mealCount + '<span class="unit">次</span></div><div class="label">吃饭</div></div>' +
+    '<div class="dash-item"><div class="value">' + sleepStr + '</div><div class="label">睡眠</div></div>' +
+    '<div class="dash-item"><div class="value">' + poopCount + '<span class="unit">次</span></div><div class="label">大便</div></div>' +
+    '<div class="dash-item"><div class="value">' + diaperCount + '<span class="unit">次</span></div><div class="label">尿布</div></div>' +
+    '</div>';
 
   // Timer: check for active sleep first
   var activeSleep = getActiveSleep();
@@ -404,35 +406,52 @@ function renderDashboard() {
     window._activeSleep = activeSleep;
   } else {
     window._activeSleep = null;
-    var feedingRecords = records.filter(function(r) { return r.type === 'milk' || r.type === 'meal' || r.type === 'snack' || r.type === 'sleep' || r.type === 'poop'; });
+
+    // Last feeding (milk / meal / snack)
+    var feedingRecords = records.filter(function(r) { return r.type === 'milk' || r.type === 'meal' || r.type === 'snack'; });
     feedingRecords.sort(function(a, b) { return b.timestamp - a.timestamp; });
     var lastFeeding = feedingRecords[0];
 
+    // Last diaper
+    var diaperRecs = records.filter(function(r) { return r.type === 'diaper'; });
+    diaperRecs.sort(function(a, b) { return b.timestamp - a.timestamp; });
+    var lastDiaper = diaperRecs[0];
+
+    var feedingHtml = '';
     if (lastFeeding) {
       var diff = Date.now() - lastFeeding.timestamp;
       var h = Math.floor(diff / 3600000);
       var m = Math.floor((diff % 3600000) / 60000);
-      var typeName = getTypeName(lastFeeding.type);
-      var detail = '';
-      if (lastFeeding.type === 'milk') detail = lastFeeding.amount + 'ml';
-      else if (lastFeeding.type === 'sleep') {
-        if (lastFeeding.sleep_start && lastFeeding.sleep_end) {
-          var sdur = lastFeeding.sleep_end - lastFeeding.sleep_start;
-          detail = Math.floor(sdur / 3600000) + '小时' + Math.floor((sdur % 3600000) / 60000) + '分钟';
-        }
-      }
-      else if (lastFeeding.subtype) detail = lastFeeding.subtype;
-
-      timerCard.innerHTML =
-        '<div class="timer-label">距上次' + typeName + '</div>' +
-        '<div class="timer-value" id="timerValue">' + h + '小时' + m + '分钟</div>' +
+      var detail = lastFeeding.type === 'milk' ? lastFeeding.amount + 'ml' : (lastFeeding.subtype || getTypeName(lastFeeding.type));
+      feedingHtml =
+        '<div class="timer-label">距上次进食</div>' +
+        '<div class="timer-value" id="timerFeeding">' + h + '小时' + m + '分钟</div>' +
         '<div class="timer-detail">' + detail + ' · ' + formatTime(lastFeeding.timestamp) + '</div>';
     } else {
-      timerCard.innerHTML =
+      feedingHtml =
         '<div class="timer-label">距上次进食</div>' +
         '<div class="timer-value">--</div>' +
-        '<div class="timer-detail">暂无喂养记录</div>';
+        '<div class="timer-detail">暂无记录</div>';
     }
+
+    var diaperHtml = '';
+    if (lastDiaper) {
+      var dDiff = Date.now() - lastDiaper.timestamp;
+      var dh = Math.floor(dDiff / 3600000);
+      var dm = Math.floor((dDiff % 3600000) / 60000);
+      var dDetail = lastDiaper.diaper_type || '尿布';
+      diaperHtml =
+        '<div class="timer-label" style="margin-top:16px">距上次尿布</div>' +
+        '<div class="timer-value" id="timerDiaper">' + dh + '小时' + dm + '分钟</div>' +
+        '<div class="timer-detail">' + dDetail + ' · ' + formatTime(lastDiaper.timestamp) + '</div>';
+    } else {
+      diaperHtml =
+        '<div class="timer-label" style="margin-top:16px">距上次尿布</div>' +
+        '<div class="timer-value">--</div>' +
+        '<div class="timer-detail">暂无记录</div>';
+    }
+
+    timerCard.innerHTML = feedingHtml + diaperHtml;
   }
 
   // Recent 4 records — enhanced card style
@@ -1148,22 +1167,6 @@ function renderStats() {
   }
   html += '</div>';
 
-  // H/W line chart with BMI
-  html += '<div class="chart-container"><div class="chart-title">身高体重变化</div>';
-  html += bmiText;
-  if (hwChartData.length >= 2) {
-    html += '<canvas id="hwChart" width="320" height="180" style="width:100%;max-width:420px"></canvas>';
-  } else if (hwChartData.length === 1) {
-    var r = hwChartData[0];
-    html += '<div style="text-align:center;padding:16px;font-size:15px;">' +
-      (r.height ? '身高: ' + r.height + 'cm  ' : '') +
-      (r.weight ? '体重: ' + r.weight + '斤' : '') +
-      '<br><span style="font-size:12px;color:var(--text-light)">至少需要2条记录才能绘制趋势图</span></div>';
-  } else {
-    html += '<div class="stat-empty">暂无身高体重数据</div>';
-  }
-  html += '</div>';
-
   // Sleep records section
   var sleepRecords = records.filter(function(r) { return r.type === 'sleep'; }).sort(function(a, b) { return b.timestamp - a.timestamp; });
   if (sleepRecords.length > 0) {
@@ -1229,6 +1232,22 @@ function renderStats() {
   } else {
     html += '<div class="chart-container"><div class="chart-title">尿布统计</div><div class="stat-empty">暂无尿布数据</div></div>';
   }
+
+  // H/W line chart with BMI (moved to end)
+  html += '<div class="chart-container"><div class="chart-title">身高体重变化</div>';
+  html += bmiText;
+  if (hwChartData.length >= 2) {
+    html += '<canvas id="hwChart" width="320" height="180" style="width:100%;max-width:420px"></canvas>';
+  } else if (hwChartData.length === 1) {
+    var r = hwChartData[0];
+    html += '<div style="text-align:center;padding:16px;font-size:15px;">' +
+      (r.height ? '身高: ' + r.height + 'cm  ' : '') +
+      (r.weight ? '体重: ' + r.weight + '斤' : '') +
+      '<br><span style="font-size:12px;color:var(--text-light)">至少需要2条记录才能绘制趋势图</span></div>';
+  } else {
+    html += '<div class="stat-empty">暂无身高体重数据</div>';
+  }
+  html += '</div>';
 
   container.innerHTML = html;
 
@@ -1625,25 +1644,42 @@ function closeNotif() {
 // ------- Timer Update -------
 function updateTimer() {
   if (currentPage !== 'dashboard') return;
-  var timerValue = document.getElementById('timerValue');
-  if (!timerValue) return;
 
   var activeSleep = window._activeSleep;
   if (activeSleep && activeSleep.sleep_start) {
+    var timerValue = document.getElementById('timerValue');
+    if (!timerValue) return;
     var diff = Date.now() - activeSleep.sleep_start;
     var h = Math.floor(diff / 3600000);
     var m = Math.floor((diff % 3600000) / 60000);
     timerValue.textContent = h + '小时' + m + '分钟';
   } else {
     var records = getRecords();
-    var feedingRecords = records.filter(function(r) { return r.type === 'milk' || r.type === 'meal' || r.type === 'snack' || r.type === 'sleep' || r.type === 'poop'; });
-    feedingRecords.sort(function(a, b) { return b.timestamp - a.timestamp; });
-    var last = feedingRecords[0];
-    if (last) {
-      var diff = Date.now() - last.timestamp;
-      var h = Math.floor(diff / 3600000);
-      var m = Math.floor((diff % 3600000) / 60000);
-      timerValue.textContent = h + '小时' + m + '分钟';
+
+    var timerFeeding = document.getElementById('timerFeeding');
+    if (timerFeeding) {
+      var feedingRecords = records.filter(function(r) { return r.type === 'milk' || r.type === 'meal' || r.type === 'snack'; });
+      feedingRecords.sort(function(a, b) { return b.timestamp - a.timestamp; });
+      var last = feedingRecords[0];
+      if (last) {
+        var diff = Date.now() - last.timestamp;
+        var h = Math.floor(diff / 3600000);
+        var m = Math.floor((diff % 3600000) / 60000);
+        timerFeeding.textContent = h + '小时' + m + '分钟';
+      }
+    }
+
+    var timerDiaper = document.getElementById('timerDiaper');
+    if (timerDiaper) {
+      var diaperRecs = records.filter(function(r) { return r.type === 'diaper'; });
+      diaperRecs.sort(function(a, b) { return b.timestamp - a.timestamp; });
+      var lastDiaper = diaperRecs[0];
+      if (lastDiaper) {
+        var dDiff = Date.now() - lastDiaper.timestamp;
+        var dh = Math.floor(dDiff / 3600000);
+        var dm = Math.floor((dDiff % 3600000) / 60000);
+        timerDiaper.textContent = dh + '小时' + dm + '分钟';
+      }
     }
   }
 }

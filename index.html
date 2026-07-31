@@ -87,6 +87,35 @@ body {
 .dash-item .value { font-size:28px; font-weight:700; color:var(--pink); }
 .dash-item .label { font-size:12px; color:var(--text-light); margin-top:4px; }
 .dash-item .unit { font-size:13px; font-weight:400; color:var(--text-light); }
+.dash-milk-hero {
+  grid-column: 1 / -1;
+  background: var(--card);
+  border-radius: var(--radius-sm);
+  padding: 20px 8px;
+  text-align: center;
+  box-shadow: var(--shadow);
+}
+.dash-milk-hero .hero-value {
+  font-size: 42px;
+  font-weight: 700;
+  color: var(--pink);
+}
+.dash-milk-hero .label {
+  font-size: 13px;
+  color: var(--text-light);
+  margin-top: 4px;
+}
+.dash-milk-hero .unit {
+  font-size: 16px;
+  font-weight: 400;
+  color: var(--text-light);
+}
+.dash-sub-row {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
 .timer-card {
   background:linear-gradient(135deg, var(--pink-light), var(--peach));
   border-radius:var(--radius); padding:16px; margin-bottom:12px; text-align:center; color:#fff;
