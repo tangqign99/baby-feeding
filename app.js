@@ -496,10 +496,10 @@ function renderEntry() {
     { id: 'milk', label: '🍼 奶量' },
     { id: 'meal', label: '🍚 吃饭' },
     { id: 'snack', label: '🥄 辅食' },
-    { id: 'poop', label: '💩 大便' },
-    { id: 'diaper', label: '🧷 尿布' }
+    { id: 'poop', label: '💩 大便' }
   ];
   var tabsRow2 = [
+    { id: 'diaper', label: '🧷 尿布' },
     { id: 'height', label: '📏 身高' },
     { id: 'weight', label: '⚖️ 体重' },
     { id: 'sleep', label: '💤 睡眠' }
@@ -625,10 +625,16 @@ function renderEntryContent() {
           '<br><button onclick="showManualSleep()" style="border:none;background:none;color:var(--text-light);font-size:13px;padding:8px;cursor:pointer;text-decoration:underline">或手动录入完整睡眠</button>' +
           '</div>';
       } else {
+        var nowLocal = toDatetimeLocal(Date.now());
         container.innerHTML =
           '<div style="text-align:center;padding:20px 0">' +
           '<button class="btn-primary" onclick="recordSleepStart()" style="font-size:18px;padding:20px 48px;border-radius:28px;font-weight:700;letter-spacing:2px">宝宝睡着了</button>' +
-          '<div style="margin-top:16px">' +
+          '<div style="margin-top:20px;border-top:1px solid var(--border);padding-top:16px">' +
+          '<label style="display:block;font-size:13px;color:var(--text-light);margin-bottom:6px;">或选择入睡时间</label>' +
+          '<input type="datetime-local" id="sleepStartTime" value="' + nowLocal + '" style="width:100%;max-width:260px;padding:12px;border:2px solid var(--border);border-radius:var(--radius-sm);font-size:15px;outline:none;background:var(--card);color:var(--text);margin-bottom:10px;text-align:center;">' +
+          '<br><button class="btn-primary" onclick="recordSleepStart(document.getElementById(\'sleepStartTime\').value)" style="background:var(--blue);font-size:15px;padding:12px 32px;border-radius:24px">按时间入睡</button>' +
+          '</div>' +
+          '<div style="margin-top:12px">' +
           '<button onclick="showManualSleep()" style="border:none;background:none;color:var(--text-light);font-size:13px;padding:8px;cursor:pointer;text-decoration:underline">或手动录入完整睡眠</button>' +
           '</div>' +
           '</div>';
@@ -899,10 +905,11 @@ async function recordPoop() {
 // addRecord removed — use saveRecord(record) instead
 
 // ------- Sleep: two-phase entry -------
-async function recordSleepStart() {
+async function recordSleepStart(specifiedTime) {
   var noteEl = document.getElementById('sleepNote');
   var note = noteEl ? noteEl.value.trim() : '';
-  var now = getEntryTimestamp();
+  var now = specifiedTime ? new Date(specifiedTime).getTime() : getEntryTimestamp();
+  if (isNaN(now)) now = Date.now();
 
   var record = {
     type: 'sleep',
