@@ -1,5 +1,5 @@
 /* ============================================
-   宝宝喂养记录 PWA - 应用逻辑 v3.9 (Supabase)
+   宝宝喂养记录 PWA - 应用逻辑 v3.10 (Supabase)
    ============================================ */
 
 // ------- Supabase -------
@@ -695,7 +695,9 @@ async function recordMilk() {
 async function recordMeal() {
   var subtype = selectedPreset;
   var customEl = document.getElementById('customMeal');
-  if (!subtype && customEl && customEl.value) subtype = customEl.value.trim();
+  var customFood = customEl ? customEl.value.trim() : '';
+  if (!subtype && customFood) subtype = customFood;
+  else if (subtype && customFood) subtype = subtype + ' · ' + customFood;
   if (!subtype) { toast('请选择餐次或输入食物', 'warning'); return; }
 
   var noteEl = document.getElementById('mealNote');
@@ -721,7 +723,9 @@ async function recordMeal() {
 async function recordSnack() {
   var subtype = selectedPreset;
   var customEl = document.getElementById('customSnack');
-  if (!subtype && customEl && customEl.value) subtype = customEl.value.trim();
+  var customFood = customEl ? customEl.value.trim() : '';
+  if (!subtype && customFood) subtype = customFood;
+  else if (subtype && customFood) subtype = subtype + ' · ' + customFood;
   if (!subtype) { toast('请选择辅食类型或输入名称', 'warning'); return; }
 
   var noteEl = document.getElementById('snackNote');
