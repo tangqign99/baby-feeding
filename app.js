@@ -1,5 +1,5 @@
 /* ============================================
-   宝宝喂养记录 PWA - 应用逻辑 v3.7 (Supabase)
+   宝宝喂养记录 PWA - 应用逻辑 v3.8 (Supabase)
    ============================================ */
 
 // ------- Supabase -------
@@ -319,6 +319,16 @@ function renderPage(page) {
   }
 }
 
+// ------- Note toggle -------
+function toggleNote(el) {
+  var content = el.nextElementSibling;
+  var arrow = el.querySelector('.note-arrow');
+  if (!content || !arrow) return;
+  var isHidden = content.style.display === 'none';
+  content.style.display = isHidden ? 'block' : 'none';
+  arrow.textContent = isHidden ? '▼' : '▶';
+}
+
 // ------- Delete Record -------
 async function deleteRecord(id) {
   if (!confirm('确定要删除这条记录吗？')) return;
@@ -407,7 +417,7 @@ function renderDashboard() {
       var noteHtml = '';
       if (r.note) {
         noteHtml =
-          '<div class="rc-note-toggle" onclick="event.stopPropagation();var n=this.nextElementSibling;var t=this.querySelector(\'.note-arrow\');n.style.display=n.style.display===\'none\'?\'block\':\'none\';t.textContent=n.style.display===\'none\'?\'▶\':\'▼\';">' +
+          '<div class="rc-note-toggle" onclick="event.stopPropagation();toggleNote(this);">' +
           '<span class="note-arrow">▶</span> 备注</div>' +
           '<div class="rc-note-content" style="display:none">' + escapeHtml(r.note) + '</div>';
       }
@@ -452,21 +462,29 @@ var selectedPreset = '';
 var selectedPortion = '';
 
 function renderEntry() {
-  var tabs = [
+  var tabsRow1 = [
     { id: 'milk', label: '🍼 奶量' },
     { id: 'meal', label: '🍚 吃饭' },
     { id: 'snack', label: '🥄 辅食' },
-    { id: 'height', label: '📏 身高' },
-    { id: 'weight', label: '⚖️ 体重' },
-    { id: 'sleep', label: '💤 睡眠' },
     { id: 'poop', label: '💩 大便' }
   ];
+  var tabsRow2 = [
+    { id: 'height', label: '📏 身高' },
+    { id: 'weight', label: '⚖️ 体重' },
+    { id: 'sleep', label: '💤 睡眠' }
+  ];
+  var allTabs = tabsRow1.concat(tabsRow2);
 
-  var tabHtml = '';
-  tabs.forEach(function(t) {
-    tabHtml += '<button class="tab-btn' + (entryTab === t.id ? ' active' : '') + '" data-tab="' + t.id + '">' + t.label + '</button>';
+  var html = '<div class="tab-bar">';
+  tabsRow1.forEach(function(t) {
+    html += '<button class="tab-btn' + (entryTab === t.id ? ' active' : '') + '" data-tab="' + t.id + '">' + t.label + '</button>';
   });
-  document.getElementById('entryTabs').innerHTML = tabHtml;
+  html += '</div><div class="tab-bar tab-bar-row2">';
+  tabsRow2.forEach(function(t) {
+    html += '<button class="tab-btn' + (entryTab === t.id ? ' active' : '') + '" data-tab="' + t.id + '">' + t.label + '</button>';
+  });
+  html += '</div>';
+  document.getElementById('entryTabs').innerHTML = html;
 
   document.querySelectorAll('#entryTabs .tab-btn').forEach(function(btn) {
     btn.addEventListener('click', function() {
@@ -799,7 +817,9 @@ async function recordSleep() {
 }
 
 async function recordPoop() {
-  var poopType = selectedPreset;
+  // Read selected preset directly from DOM to avoid global state issues
+  var selectedBtn = document.querySelector('#entryContent .preset-btn.selected');
+  var poopType = (selectedBtn ? selectedBtn.textContent.trim() : '') || selectedPreset;
   if (!poopType) { toast('请选择大便性状', 'warning'); return; }
 
   var noteEl = document.getElementById('poopNote');
@@ -878,7 +898,7 @@ function renderTimeline() {
         var tlNoteHtml = '';
         if (r.note) {
           tlNoteHtml =
-            '<div class="tl-note-toggle" onclick="event.stopPropagation();var n=this.nextElementSibling;var t=this.querySelector(\'.note-arrow\');n.style.display=n.style.display===\'none\'?\'block\':\'none\';t.textContent=n.style.display===\'none\'?\'▶\':\'▼\';">' +
+            '<div class="tl-note-toggle" onclick="event.stopPropagation();toggleNote(this);">' +
             '<span class="note-arrow">▶</span> 备注</div>' +
             '<div class="tl-note-content" style="display:none">' + escapeHtml(r.note) + '</div>';
         }

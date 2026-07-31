@@ -171,6 +171,7 @@ body {
 .datetime-row input[type="datetime-local"]:focus { border-color: var(--pink); }
 /* Quick Entry */
 .tab-bar { display:flex; gap:6px; margin-bottom:12px; }
+.tab-bar-row2 { margin-top:-6px; }
 .tab-btn {
   flex:1; padding:10px 6px; border:none; border-radius:20px; font-size:13px;
   background:#f5f5f5; color:var(--text); cursor:pointer; transition:all 0.2s;
@@ -407,7 +408,7 @@ body {
     </div>
     <button class="btn-danger" onclick="clearAllData()">清空所有数据</button>
     <div style="text-align:center;padding:16px;font-size:12px;color:var(--text-light)">
-      宝宝喂养记录 v3.7 · 数据云端同步 (Supabase)
+      宝宝喂养记录 v3.8 · 数据云端同步 (Supabase)
     </div>
   </div>
 
@@ -439,11 +440,11 @@ body {
 
 <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-  <script src="./app.js?v=3.7"></script>
+  <script src="./app.js?v=3.8"></script>
   <script>
     // Service Worker 注册
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('./sw.js?v=3.7').then(function(reg) {
+      navigator.serviceWorker.register('./sw.js?v=3.8').then(function(reg) {
         console.log('SW registered:', reg.scope);
       }).catch(function(err) {
         console.log('SW failed:', err);
