@@ -79,14 +79,14 @@ body {
 }
 .card-title { font-size:15px; font-weight:600; margin-bottom:12px; color:var(--text); }
 /* Dashboard */
-.dash-summary { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-bottom:16px; }
+.dash-summary { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:16px; }
 .dash-item {
-  background:var(--card); border-radius:var(--radius-sm); padding:18px 14px;
+  background:var(--card); border-radius:var(--radius-sm); padding:14px 8px;
   text-align:center; box-shadow:var(--shadow);
 }
-.dash-item .value { font-size:38px; font-weight:700; color:var(--pink); }
-.dash-item .label { font-size:14px; color:var(--text-light); margin-top:6px; }
-.dash-item .unit { font-size:16px; font-weight:400; color:var(--text-light); }
+.dash-item .value { font-size:28px; font-weight:700; color:var(--pink); }
+.dash-item .label { font-size:12px; color:var(--text-light); margin-top:4px; }
+.dash-item .unit { font-size:13px; font-weight:400; color:var(--text-light); }
 .timer-card {
   background:linear-gradient(135deg, var(--pink-light), var(--peach));
   border-radius:var(--radius); padding:16px; margin-bottom:12px; text-align:center; color:#fff;
@@ -123,6 +123,32 @@ body {
   transition: all 0.15s; line-height: 1;
 }
 .rc-delete-btn:hover, .rc-delete-btn:active { color: #e74c3c; background: #FFF0F0; }
+/* Note toggle in record cards */
+.rc-note-toggle {
+  font-size: 11px; color: var(--pink); cursor: pointer;
+  margin-top: 4px; display: inline-flex; align-items: center; gap: 3px;
+  user-select: none; padding: 2px 6px; border-radius: 8px;
+  transition: background 0.15s;
+}
+.rc-note-toggle:hover { background: #FFF0F0; }
+.rc-note-content {
+  font-size: 12px; color: var(--text-light); margin-top: 4px;
+  padding: 6px 10px; background: #F9F9F9; border-radius: 8px;
+  line-height: 1.4;
+}
+/* Note toggle in timeline */
+.tl-note-toggle {
+  font-size: 10px; color: var(--pink); cursor: pointer;
+  margin-top: 2px; display: inline-flex; align-items: center; gap: 2px;
+  user-select: none; padding: 1px 5px; border-radius: 6px;
+  transition: background 0.15s;
+}
+.tl-note-toggle:hover { background: #FFF0F0; }
+.tl-note-content {
+  font-size: 11px; color: var(--text-light); margin-top: 3px;
+  padding: 4px 8px; background: #F9F9F9; border-radius: 6px;
+  line-height: 1.4;
+}
 /* Timeline delete */
 .tl-delete-btn {
   width: 28px; height: 28px; border-radius: 50%; border: none;
@@ -381,7 +407,7 @@ body {
     </div>
     <button class="btn-danger" onclick="clearAllData()">清空所有数据</button>
     <div style="text-align:center;padding:16px;font-size:12px;color:var(--text-light)">
-      宝宝喂养记录 v3.5 · 数据云端同步 (Supabase)
+      宝宝喂养记录 v3.7 · 数据云端同步 (Supabase)
     </div>
   </div>
 
@@ -413,11 +439,11 @@ body {
 
 <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-  <script src="./app.js?v=3.6"></script>
+  <script src="./app.js?v=3.7"></script>
   <script>
     // Service Worker 注册
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('./sw.js?v=3.6').then(function(reg) {
+      navigator.serviceWorker.register('./sw.js?v=3.7').then(function(reg) {
         console.log('SW registered:', reg.scope);
       }).catch(function(err) {
         console.log('SW failed:', err);

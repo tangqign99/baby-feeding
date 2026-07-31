@@ -1,5 +1,5 @@
 /* ============================================
-   宝宝喂养记录 PWA - 应用逻辑 v3.6 (Supabase)
+   宝宝喂养记录 PWA - 应用逻辑 v3.7 (Supabase)
    ============================================ */
 
 // ------- Supabase -------
@@ -201,6 +201,10 @@ function toast(msg, type) {
 // ------- Helpers -------
 function genId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
 
+function escapeHtml(str) {
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
 function formatTime(ts) {
   var d = new Date(ts);
   var h = d.getHours();
@@ -254,6 +258,7 @@ function getTypeIcon(type) {
     case 'meal': return '🍚';
     case 'snack': return '🥄';
     case 'sleep': return '💤';
+    case 'poop': return '💩';
     case 'height': return '📏';
     case 'weight': return '⚖️';
     case 'hw': return '📏';
@@ -267,6 +272,7 @@ function getTypeName(type) {
     case 'meal': return '吃饭';
     case 'snack': return '辅食';
     case 'sleep': return '睡眠';
+    case 'poop': return '大便';
     case 'height': return '身高';
     case 'weight': return '体重';
     case 'hw': return '身高体重';
@@ -280,6 +286,7 @@ function getIconBg(type) {
     case 'meal': return '#FFF8F0';
     case 'snack': return '#FFFDEB';
     case 'sleep': return '#F0F0FF';
+    case 'poop': return '#F5E6CC';
     case 'height': return '#F0F4FF';
     case 'weight': return '#F0FFF4';
     default: return '#F5F5F5';
@@ -338,7 +345,7 @@ function renderDashboard() {
   // Summary: today
   var today = formatDate(Date.now());
   var todayRecords = records.filter(function(r) { return formatDate(r.timestamp) === today; });
-  var totalMilk = 0, mealCount = 0, snackCount = 0, sleepCount = 0, totalSleepMin = 0;
+  var totalMilk = 0, mealCount = 0, snackCount = 0, sleepCount = 0, totalSleepMin = 0, poopCount = 0;
   todayRecords.forEach(function(r) {
     if (r.type === 'milk') totalMilk += (r.amount || 0);
     if (r.type === 'meal') mealCount += 1;
@@ -347,16 +354,18 @@ function renderDashboard() {
       sleepCount += 1;
       if (r.sleep_start && r.sleep_end) totalSleepMin += Math.floor((r.sleep_end - r.sleep_start) / 60000);
     }
+    if (r.type === 'poop') poopCount += 1;
   });
   var sleepStr = sleepCount > 0 ? Math.floor(totalSleepMin / 60) + 'h' + (totalSleepMin % 60) + 'm' : '--';
 
   document.getElementById('dashSummary').innerHTML =
     '<div class="dash-item"><div class="value">' + totalMilk + '<span class="unit">ml</span></div><div class="label">今日奶量</div></div>' +
     '<div class="dash-item"><div class="value">' + mealCount + '</div><div class="label">吃饭次数</div></div>' +
-    '<div class="dash-item"><div class="value">' + sleepStr + '</div><div class="label">今日睡眠</div></div>';
+    '<div class="dash-item"><div class="value">' + sleepStr + '</div><div class="label">今日睡眠</div></div>' +
+    '<div class="dash-item"><div class="value">' + poopCount + '</div><div class="label">今日大便</div></div>';
 
   // Timer: last feeding or sleep
-  var feedingRecords = records.filter(function(r) { return r.type === 'milk' || r.type === 'meal' || r.type === 'snack' || r.type === 'sleep'; });
+  var feedingRecords = records.filter(function(r) { return r.type === 'milk' || r.type === 'meal' || r.type === 'snack' || r.type === 'sleep' || r.type === 'poop'; });
   feedingRecords.sort(function(a, b) { return b.timestamp - a.timestamp; });
   var lastFeeding = feedingRecords[0];
 
@@ -395,12 +404,20 @@ function renderDashboard() {
   } else {
     recent.forEach(function(r) {
       var desc = buildRecordDesc(r);
+      var noteHtml = '';
+      if (r.note) {
+        noteHtml =
+          '<div class="rc-note-toggle" onclick="event.stopPropagation();var n=this.nextElementSibling;var t=this.querySelector(\'.note-arrow\');n.style.display=n.style.display===\'none\'?\'block\':\'none\';t.textContent=n.style.display===\'none\'?\'▶\':\'▼\';">' +
+          '<span class="note-arrow">▶</span> 备注</div>' +
+          '<div class="rc-note-content" style="display:none">' + escapeHtml(r.note) + '</div>';
+      }
       recentHtml +=
         '<div class="record-card">' +
         '<div class="rc-icon-wrap" style="background:' + getIconBg(r.type) + '">' + getTypeIcon(r.type) + '</div>' +
         '<div class="rc-body">' +
         '<div class="rc-type">' + getTypeName(r.type) + '</div>' +
         '<div class="rc-detail">' + desc + '</div>' +
+        noteHtml +
         '<div class="rc-meta"><span class="rc-time">' + formatTime(r.timestamp) + '</span><span class="rc-ago">' + timeAgo(r.timestamp) + '</span></div>' +
         '</div>' +
         '<button class="rc-delete-btn" title="删除" onclick="event.stopPropagation();deleteRecord(\'' + r.id + '\')">&times;</button>' +
@@ -411,17 +428,18 @@ function renderDashboard() {
 }
 
 function buildRecordDesc(r) {
-  if (r.type === 'milk') return r.amount + ' ml' + (r.note ? ' · ' + r.note : '');
-  if (r.type === 'meal' || r.type === 'snack') return (r.subtype || getTypeName(r.type)) + (r.portion ? ' · ' + r.portion + '量' : '') + (r.note ? ' · ' + r.note : '');
+  if (r.type === 'milk') return r.amount + ' ml';
+  if (r.type === 'meal' || r.type === 'snack') return (r.subtype || getTypeName(r.type)) + (r.portion ? ' · ' + r.portion + '量' : '');
   if (r.type === 'sleep') {
     if (r.sleep_start && r.sleep_end) {
       var dur = r.sleep_end - r.sleep_start;
       var sh = Math.floor(dur / 3600000);
       var sm = Math.floor((dur % 3600000) / 60000);
-      return '睡眠 ' + sh + '小时' + sm + '分钟' + (r.note ? ' · ' + r.note : '');
+      return '睡眠 ' + sh + '小时' + sm + '分钟';
     }
-    return '睡眠' + (r.note ? ' · ' + r.note : '');
+    return '睡眠';
   }
+  if (r.type === 'poop') return r.poop_type || '大便';
   if (r.type === 'height') return r.height + ' cm';
   if (r.type === 'weight') return r.weight + ' 斤';
   if (r.type === 'hw') return (r.height ? r.height + 'cm' : '') + (r.weight ? ' ' + r.weight + '斤' : '');
@@ -440,7 +458,8 @@ function renderEntry() {
     { id: 'snack', label: '🥄 辅食' },
     { id: 'height', label: '📏 身高' },
     { id: 'weight', label: '⚖️ 体重' },
-    { id: 'sleep', label: '💤 睡眠' }
+    { id: 'sleep', label: '💤 睡眠' },
+    { id: 'poop', label: '💩 大便' }
   ];
 
   var tabHtml = '';
@@ -556,6 +575,18 @@ function renderEntryContent() {
         '<input type="text" id="sleepNote" placeholder="备注（可选）" maxlength="50">' +
         '</div>' +
         '<button class="btn-primary" onclick="recordSleep()">记录睡眠</button>';
+      break;
+
+    case 'poop':
+      container.innerHTML =
+        '<div style="font-size:13px;color:var(--text-light);margin-bottom:6px;">性状</div>' +
+        '<div class="preset-grid" id="presetGrid"></div>' +
+        '<div class="entry-row">' +
+        '<input type="text" id="poopNote" placeholder="备注（可选）" maxlength="50">' +
+        '</div>' +
+        datetimeRowHtml() +
+        '<button class="btn-primary" onclick="recordPoop()">记录大便</button>';
+      buildPresetGrid(['正常', '稀便', '干硬', '绿色', '其他'], '');
       break;
   }
 }
@@ -767,11 +798,33 @@ async function recordSleep() {
   navigateTo('dashboard');
 }
 
+async function recordPoop() {
+  var poopType = selectedPreset;
+  if (!poopType) { toast('请选择大便性状', 'warning'); return; }
+
+  var noteEl = document.getElementById('poopNote');
+  var note = noteEl ? noteEl.value.trim() : '';
+
+  var record = {
+    type: 'poop',
+    poop_type: poopType,
+    timestamp: getEntryTimestamp(),
+    note: note
+  };
+
+  await saveRecord(record);
+  toast('记录成功：大便 · ' + poopType + ' 💩', 'success');
+  entryTab = 'poop';
+  selectedPreset = '';
+  renderEntry();
+  navigateTo('dashboard');
+}
+
 // addRecord removed — use saveRecord(record) instead
 
 // ------- Timeline -------
 function isFeedingOrSleep(type) {
-  return type === 'milk' || type === 'meal' || type === 'snack' || type === 'sleep';
+  return type === 'milk' || type === 'meal' || type === 'snack' || type === 'sleep' || type === 'poop';
 }
 
 function formatInterval(ms) {
@@ -822,9 +875,17 @@ function renderTimeline() {
           intervalStr = '<div class="tl-interval">' + formatInterval(intervals[key]) + '</div>';
         }
 
+        var tlNoteHtml = '';
+        if (r.note) {
+          tlNoteHtml =
+            '<div class="tl-note-toggle" onclick="event.stopPropagation();var n=this.nextElementSibling;var t=this.querySelector(\'.note-arrow\');n.style.display=n.style.display===\'none\'?\'block\':\'none\';t.textContent=n.style.display===\'none\'?\'▶\':\'▼\';">' +
+            '<span class="note-arrow">▶</span> 备注</div>' +
+            '<div class="tl-note-content" style="display:none">' + escapeHtml(r.note) + '</div>';
+        }
+
         html += '<div class="tl-item">' +
           '<div class="tl-icon" style="background:' + getIconBg(r.type) + ';border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;">' + getTypeIcon(r.type) + '</div>' +
-          '<div class="tl-content"><div class="tl-title">' + desc + '</div><div class="tl-time">' + formatTime(r.timestamp) + intervalStr + '</div></div>' +
+          '<div class="tl-content"><div class="tl-title">' + desc + '</div>' + tlNoteHtml + '<div class="tl-time">' + formatTime(r.timestamp) + intervalStr + '</div></div>' +
           '<div class="tl-ago">' + timeAgo(r.timestamp) + '</div>' +
           '<button class="tl-delete-btn" title="删除" onclick="event.stopPropagation();deleteRecord(\'' + r.id + '\')">&times;</button>' +
           '</div>';
@@ -1221,6 +1282,8 @@ function exportExcel(records, label) {
           var sdur = r.sleep_end - r.sleep_start;
           row['睡眠时长'] = Math.floor(sdur / 3600000) + '小时' + Math.floor((sdur % 3600000) / 60000) + '分钟';
         }
+      } else if (r.type === 'poop') {
+        row['大便性状'] = r.poop_type || '';
       }
       return row;
     });
@@ -1275,7 +1338,7 @@ function checkNotif() {
   if (!s.notifEnabled) return;
 
   var records = getRecords();
-  var feedingRecords = records.filter(function(r) { return r.type === 'milk' || r.type === 'meal' || r.type === 'snack' || r.type === 'sleep'; });
+  var feedingRecords = records.filter(function(r) { return r.type === 'milk' || r.type === 'meal' || r.type === 'snack' || r.type === 'sleep' || r.type === 'poop'; });
   feedingRecords.sort(function(a, b) { return b.timestamp - a.timestamp; });
   var last = feedingRecords[0];
 
@@ -1314,7 +1377,7 @@ function closeNotif() {
 function updateTimer() {
   if (currentPage !== 'dashboard') return;
   var records = getRecords();
-  var feedingRecords = records.filter(function(r) { return r.type === 'milk' || r.type === 'meal' || r.type === 'snack' || r.type === 'sleep'; });
+  var feedingRecords = records.filter(function(r) { return r.type === 'milk' || r.type === 'meal' || r.type === 'snack' || r.type === 'sleep' || r.type === 'poop'; });
   feedingRecords.sort(function(a, b) { return b.timestamp - a.timestamp; });
   var last = feedingRecords[0];
   var timerValue = document.getElementById('timerValue');
