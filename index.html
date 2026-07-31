@@ -382,7 +382,8 @@ body {
   <!-- Page: Dashboard -->
   <div class="page active" id="page-dashboard">
     <div class="dash-summary" id="dashSummary"></div>
-    <div class="timer-card" id="timerCard"></div>
+    <div class="timer-card" id="timerSleep"></div>
+    <div class="timer-card" id="timerFeeding"></div>
     <div class="card">
       <div class="card-title">最近记录</div>
       <div id="recentList"></div>
@@ -473,11 +474,11 @@ body {
 
 <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-  <script src="./app.js?v=3.12"></script>
+  <script src="./app.js?v=3.13"></script>
   <script>
     // Service Worker 注册
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('./sw.js?v=3.12').then(function(reg) {
+      navigator.serviceWorker.register('./sw.js?v=3.13').then(function(reg) {
         console.log('SW registered:', reg.scope);
       }).catch(function(err) {
         console.log('SW failed:', err);
