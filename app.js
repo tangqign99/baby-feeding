@@ -1,5 +1,5 @@
 /* ============================================
-   宝宝喂养记录 PWA - 应用逻辑 v3.5 (Supabase)
+   宝宝喂养记录 PWA - 应用逻辑 v3.6 (Supabase)
    ============================================ */
 
 // ------- Supabase -------
@@ -92,6 +92,12 @@ function normalizeTimestamps(records) {
     if (typeof records[i].timestamp === 'string') {
       records[i].timestamp = new Date(records[i].timestamp).getTime();
     }
+    if (typeof records[i].sleep_start === 'string') {
+      records[i].sleep_start = new Date(records[i].sleep_start).getTime();
+    }
+    if (typeof records[i].sleep_end === 'string') {
+      records[i].sleep_end = new Date(records[i].sleep_end).getTime();
+    }
   }
   return records;
 }
@@ -105,6 +111,12 @@ async function saveRecord(record) {
   // timestamp 转为 ISO 字符串以匹配 TIMESTAMPTZ 列
   if (typeof cleanRecord.timestamp === 'number') {
     cleanRecord.timestamp = new Date(cleanRecord.timestamp).toISOString();
+  }
+  if (typeof cleanRecord.sleep_start === 'number') {
+    cleanRecord.sleep_start = new Date(cleanRecord.sleep_start).toISOString();
+  }
+  if (typeof cleanRecord.sleep_end === 'number') {
+    cleanRecord.sleep_end = new Date(cleanRecord.sleep_end).toISOString();
   }
   try {
     var { data, error } = await supabase.from('feeding_records').insert(cleanRecord).select();
@@ -133,6 +145,12 @@ function subscribeRealtime() {
         var newRecord = payload.new;
         if (typeof newRecord.timestamp === 'string') {
           newRecord.timestamp = new Date(newRecord.timestamp).getTime();
+        }
+        if (typeof newRecord.sleep_start === 'string') {
+          newRecord.sleep_start = new Date(newRecord.sleep_start).getTime();
+        }
+        if (typeof newRecord.sleep_end === 'string') {
+          newRecord.sleep_end = new Date(newRecord.sleep_end).getTime();
         }
         var exists = cachedRecords.some(function(r) { return r.id === newRecord.id; });
         if (!exists) {
@@ -235,6 +253,7 @@ function getTypeIcon(type) {
     case 'milk': return '🍼';
     case 'meal': return '🍚';
     case 'snack': return '🥄';
+    case 'sleep': return '💤';
     case 'height': return '📏';
     case 'weight': return '⚖️';
     case 'hw': return '📏';
@@ -247,6 +266,7 @@ function getTypeName(type) {
     case 'milk': return '奶量';
     case 'meal': return '吃饭';
     case 'snack': return '辅食';
+    case 'sleep': return '睡眠';
     case 'height': return '身高';
     case 'weight': return '体重';
     case 'hw': return '身高体重';
@@ -259,6 +279,7 @@ function getIconBg(type) {
     case 'milk': return '#FFF0F5';
     case 'meal': return '#FFF8F0';
     case 'snack': return '#FFFDEB';
+    case 'sleep': return '#F0F0FF';
     case 'height': return '#F0F4FF';
     case 'weight': return '#F0FFF4';
     default: return '#F5F5F5';
@@ -317,20 +338,25 @@ function renderDashboard() {
   // Summary: today
   var today = formatDate(Date.now());
   var todayRecords = records.filter(function(r) { return formatDate(r.timestamp) === today; });
-  var totalMilk = 0, mealCount = 0, snackCount = 0;
+  var totalMilk = 0, mealCount = 0, snackCount = 0, sleepCount = 0, totalSleepMin = 0;
   todayRecords.forEach(function(r) {
     if (r.type === 'milk') totalMilk += (r.amount || 0);
     if (r.type === 'meal') mealCount += 1;
     if (r.type === 'snack') snackCount += 1;
+    if (r.type === 'sleep') {
+      sleepCount += 1;
+      if (r.sleep_start && r.sleep_end) totalSleepMin += Math.floor((r.sleep_end - r.sleep_start) / 60000);
+    }
   });
+  var sleepStr = sleepCount > 0 ? Math.floor(totalSleepMin / 60) + 'h' + (totalSleepMin % 60) + 'm' : '--';
 
   document.getElementById('dashSummary').innerHTML =
     '<div class="dash-item"><div class="value">' + totalMilk + '<span class="unit">ml</span></div><div class="label">今日奶量</div></div>' +
     '<div class="dash-item"><div class="value">' + mealCount + '</div><div class="label">吃饭次数</div></div>' +
-    '<div class="dash-item"><div class="value">' + snackCount + '</div><div class="label">辅食次数</div></div>';
+    '<div class="dash-item"><div class="value">' + sleepStr + '</div><div class="label">今日睡眠</div></div>';
 
-  // Timer: last feeding
-  var feedingRecords = records.filter(function(r) { return r.type === 'milk' || r.type === 'meal' || r.type === 'snack'; });
+  // Timer: last feeding or sleep
+  var feedingRecords = records.filter(function(r) { return r.type === 'milk' || r.type === 'meal' || r.type === 'snack' || r.type === 'sleep'; });
   feedingRecords.sort(function(a, b) { return b.timestamp - a.timestamp; });
   var lastFeeding = feedingRecords[0];
 
@@ -342,6 +368,12 @@ function renderDashboard() {
     var typeName = getTypeName(lastFeeding.type);
     var detail = '';
     if (lastFeeding.type === 'milk') detail = lastFeeding.amount + 'ml';
+    else if (lastFeeding.type === 'sleep') {
+      if (lastFeeding.sleep_start && lastFeeding.sleep_end) {
+        var sdur = lastFeeding.sleep_end - lastFeeding.sleep_start;
+        detail = Math.floor(sdur / 3600000) + '小时' + Math.floor((sdur % 3600000) / 60000) + '分钟';
+      }
+    }
     else if (lastFeeding.subtype) detail = lastFeeding.subtype;
 
     timerCard.innerHTML =
@@ -381,6 +413,15 @@ function renderDashboard() {
 function buildRecordDesc(r) {
   if (r.type === 'milk') return r.amount + ' ml' + (r.note ? ' · ' + r.note : '');
   if (r.type === 'meal' || r.type === 'snack') return (r.subtype || getTypeName(r.type)) + (r.portion ? ' · ' + r.portion + '量' : '') + (r.note ? ' · ' + r.note : '');
+  if (r.type === 'sleep') {
+    if (r.sleep_start && r.sleep_end) {
+      var dur = r.sleep_end - r.sleep_start;
+      var sh = Math.floor(dur / 3600000);
+      var sm = Math.floor((dur % 3600000) / 60000);
+      return '睡眠 ' + sh + '小时' + sm + '分钟' + (r.note ? ' · ' + r.note : '');
+    }
+    return '睡眠' + (r.note ? ' · ' + r.note : '');
+  }
   if (r.type === 'height') return r.height + ' cm';
   if (r.type === 'weight') return r.weight + ' 斤';
   if (r.type === 'hw') return (r.height ? r.height + 'cm' : '') + (r.weight ? ' ' + r.weight + '斤' : '');
@@ -398,7 +439,8 @@ function renderEntry() {
     { id: 'meal', label: '🍚 吃饭' },
     { id: 'snack', label: '🥄 辅食' },
     { id: 'height', label: '📏 身高' },
-    { id: 'weight', label: '⚖️ 体重' }
+    { id: 'weight', label: '⚖️ 体重' },
+    { id: 'sleep', label: '💤 睡眠' }
   ];
 
   var tabHtml = '';
@@ -498,6 +540,22 @@ function renderEntryContent() {
         '</div>' +
         datetimeRowHtml() +
         '<button class="btn-primary" onclick="recordWeight()">记录体重</button>';
+      break;
+
+    case 'sleep':
+      container.innerHTML =
+        '<div style="margin-bottom:12px">' +
+        '<label style="display:block;font-size:13px;color:var(--text-light);margin-bottom:4px;">入睡时间</label>' +
+        '<input type="datetime-local" id="sleepStart" value="' + toDatetimeLocal(Date.now()) + '" style="width:100%;padding:14px;border:2px solid var(--border);border-radius:var(--radius-sm);font-size:15px;outline:none;background:var(--card);color:var(--text);margin-bottom:12px;">' +
+        '</div>' +
+        '<div style="margin-bottom:12px">' +
+        '<label style="display:block;font-size:13px;color:var(--text-light);margin-bottom:4px;">醒来时间</label>' +
+        '<input type="datetime-local" id="sleepEnd" value="' + toDatetimeLocal(Date.now()) + '" style="width:100%;padding:14px;border:2px solid var(--border);border-radius:var(--radius-sm);font-size:15px;outline:none;background:var(--card);color:var(--text);margin-bottom:12px;">' +
+        '</div>' +
+        '<div class="entry-row">' +
+        '<input type="text" id="sleepNote" placeholder="备注（可选）" maxlength="50">' +
+        '</div>' +
+        '<button class="btn-primary" onclick="recordSleep()">记录睡眠</button>';
       break;
   }
 }
@@ -677,12 +735,78 @@ async function recordWeight() {
   navigateTo('dashboard');
 }
 
+async function recordSleep() {
+  var startEl = document.getElementById('sleepStart');
+  var endEl = document.getElementById('sleepEnd');
+  var noteEl = document.getElementById('sleepNote');
+
+  var sleepStart = startEl && startEl.value ? new Date(startEl.value).getTime() : NaN;
+  var sleepEnd = endEl && endEl.value ? new Date(endEl.value).getTime() : NaN;
+  var note = noteEl ? noteEl.value.trim() : '';
+
+  if (isNaN(sleepStart) || isNaN(sleepEnd)) { toast('请选择入睡时间和醒来时间', 'warning'); return; }
+  if (sleepEnd <= sleepStart) { toast('醒来时间必须晚于入睡时间', 'warning'); return; }
+
+  var dur = sleepEnd - sleepStart;
+  var sh = Math.floor(dur / 3600000);
+  var sm = Math.floor((dur % 3600000) / 60000);
+
+  var record = {
+    type: 'sleep',
+    sleep_start: sleepStart,
+    sleep_end: sleepEnd,
+    timestamp: sleepStart,   // 用入睡时间作为记录时间
+    note: note
+  };
+
+  await saveRecord(record);
+  toast('记录成功：睡眠 ' + sh + '小时' + sm + '分钟 💤', 'success');
+  entryTab = 'sleep';
+  selectedPreset = '';
+  renderEntry();
+  navigateTo('dashboard');
+}
+
 // addRecord removed — use saveRecord(record) instead
 
 // ------- Timeline -------
+function isFeedingOrSleep(type) {
+  return type === 'milk' || type === 'meal' || type === 'snack' || type === 'sleep';
+}
+
+function formatInterval(ms) {
+  if (ms < 60000) return '刚刚';
+  var h = Math.floor(ms / 3600000);
+  var m = Math.floor((ms % 3600000) / 60000);
+  if (h > 0) return '间隔 ' + h + '小时' + m + '分钟';
+  return '间隔 ' + m + '分钟';
+}
+
+function computeIntervals(records) {
+  // records sorted by timestamp descending (newest first)
+  // We compute: for each record, the time diff to the previous feeding/sleep record
+  var sorted = records.slice().sort(function(a, b) { return a.timestamp - b.timestamp; });
+  var intervals = {};
+  for (var i = 0; i < sorted.length; i++) {
+    var r = sorted[i];
+    if (!isFeedingOrSleep(r.type)) continue;
+    // Find the previous feeding/sleep record
+    for (var j = i - 1; j >= 0; j--) {
+      if (isFeedingOrSleep(sorted[j].type)) {
+        var diff = r.timestamp - sorted[j].timestamp;
+        var key = r.id || (r.timestamp + '|' + r.type);
+        intervals[key] = diff;
+        break;
+      }
+    }
+  }
+  return intervals;
+}
+
 function renderTimeline() {
   var records = getRecords();
   var groups = groupByDate(records);
+  var intervals = computeIntervals(records);
   var html = '';
 
   if (groups.length === 0) {
@@ -692,10 +816,15 @@ function renderTimeline() {
       html += '<div class="date-group"><div class="date-label">' + formatDateCN(new Date(g.date + 'T00:00:00').getTime()) + '</div>';
       g.items.forEach(function(r) {
         var desc = buildRecordDesc(r);
+        var key = r.id || (r.timestamp + '|' + r.type);
+        var intervalStr = '';
+        if (isFeedingOrSleep(r.type) && intervals[key] !== undefined) {
+          intervalStr = '<div class="tl-interval">' + formatInterval(intervals[key]) + '</div>';
+        }
 
         html += '<div class="tl-item">' +
-          '<div class="tl-icon">' + getTypeIcon(r.type) + '</div>' +
-          '<div class="tl-content"><div class="tl-title">' + desc + '</div><div class="tl-time">' + formatTime(r.timestamp) + '</div></div>' +
+          '<div class="tl-icon" style="background:' + getIconBg(r.type) + ';border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;">' + getTypeIcon(r.type) + '</div>' +
+          '<div class="tl-content"><div class="tl-title">' + desc + '</div><div class="tl-time">' + formatTime(r.timestamp) + intervalStr + '</div></div>' +
           '<div class="tl-ago">' + timeAgo(r.timestamp) + '</div>' +
           '<button class="tl-delete-btn" title="删除" onclick="event.stopPropagation();deleteRecord(\'' + r.id + '\')">&times;</button>' +
           '</div>';
@@ -1085,6 +1214,13 @@ function exportExcel(records, label) {
       } else if (r.type === 'hw') {
         row['身高(cm)'] = r.height || '';
         row['体重(斤)'] = r.weight || '';
+      } else if (r.type === 'sleep') {
+        row['入睡时间'] = r.sleep_start ? formatTime(r.sleep_start) : '';
+        row['醒来时间'] = r.sleep_end ? formatTime(r.sleep_end) : '';
+        if (r.sleep_start && r.sleep_end) {
+          var sdur = r.sleep_end - r.sleep_start;
+          row['睡眠时长'] = Math.floor(sdur / 3600000) + '小时' + Math.floor((sdur % 3600000) / 60000) + '分钟';
+        }
       }
       return row;
     });
@@ -1139,7 +1275,7 @@ function checkNotif() {
   if (!s.notifEnabled) return;
 
   var records = getRecords();
-  var feedingRecords = records.filter(function(r) { return r.type === 'milk' || r.type === 'meal' || r.type === 'snack'; });
+  var feedingRecords = records.filter(function(r) { return r.type === 'milk' || r.type === 'meal' || r.type === 'snack' || r.type === 'sleep'; });
   feedingRecords.sort(function(a, b) { return b.timestamp - a.timestamp; });
   var last = feedingRecords[0];
 
@@ -1178,7 +1314,7 @@ function closeNotif() {
 function updateTimer() {
   if (currentPage !== 'dashboard') return;
   var records = getRecords();
-  var feedingRecords = records.filter(function(r) { return r.type === 'milk' || r.type === 'meal' || r.type === 'snack'; });
+  var feedingRecords = records.filter(function(r) { return r.type === 'milk' || r.type === 'meal' || r.type === 'snack' || r.type === 'sleep'; });
   feedingRecords.sort(function(a, b) { return b.timestamp - a.timestamp; });
   var last = feedingRecords[0];
   var timerValue = document.getElementById('timerValue');
