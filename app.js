@@ -394,65 +394,66 @@ function renderDashboard() {
   var activeSleep = getActiveSleep();
   var timerCard = document.getElementById('timerCard');
 
+  // Active sleep section
+  window._activeSleep = activeSleep;
+  var sleepHtml = '';
   if (activeSleep) {
     var sleepDiff = Date.now() - activeSleep.sleep_start;
     var sh = Math.floor(sleepDiff / 3600000);
     var sm = Math.floor((sleepDiff % 3600000) / 60000);
-    timerCard.innerHTML =
+    sleepHtml =
+      '<div id="timerSleepSection">' +
       '<div class="timer-label">宝宝正在睡觉</div>' +
       '<div class="timer-value" id="timerValue">' + sh + '小时' + sm + '分钟</div>' +
-      '<div class="timer-detail">入睡于 ' + formatTime(activeSleep.sleep_start) + '</div>';
-    // Store active sleep ref for updateTimer
-    window._activeSleep = activeSleep;
-  } else {
-    window._activeSleep = null;
-
-    // Last feeding (milk / meal / snack)
-    var feedingRecords = records.filter(function(r) { return r.type === 'milk' || r.type === 'meal' || r.type === 'snack'; });
-    feedingRecords.sort(function(a, b) { return b.timestamp - a.timestamp; });
-    var lastFeeding = feedingRecords[0];
-
-    // Last diaper
-    var diaperRecs = records.filter(function(r) { return r.type === 'diaper'; });
-    diaperRecs.sort(function(a, b) { return b.timestamp - a.timestamp; });
-    var lastDiaper = diaperRecs[0];
-
-    var feedingHtml = '';
-    if (lastFeeding) {
-      var diff = Date.now() - lastFeeding.timestamp;
-      var h = Math.floor(diff / 3600000);
-      var m = Math.floor((diff % 3600000) / 60000);
-      var detail = lastFeeding.type === 'milk' ? lastFeeding.amount + 'ml' : (lastFeeding.subtype || getTypeName(lastFeeding.type));
-      feedingHtml =
-        '<div class="timer-label">距上次进食</div>' +
-        '<div class="timer-value" id="timerFeeding">' + h + '小时' + m + '分钟</div>' +
-        '<div class="timer-detail">' + detail + ' · ' + formatTime(lastFeeding.timestamp) + '</div>';
-    } else {
-      feedingHtml =
-        '<div class="timer-label">距上次进食</div>' +
-        '<div class="timer-value">--</div>' +
-        '<div class="timer-detail">暂无记录</div>';
-    }
-
-    var diaperHtml = '';
-    if (lastDiaper) {
-      var dDiff = Date.now() - lastDiaper.timestamp;
-      var dh = Math.floor(dDiff / 3600000);
-      var dm = Math.floor((dDiff % 3600000) / 60000);
-      var dDetail = lastDiaper.diaper_type || '尿布';
-      diaperHtml =
-        '<div class="timer-label" style="margin-top:16px">距上次尿布</div>' +
-        '<div class="timer-value" id="timerDiaper">' + dh + '小时' + dm + '分钟</div>' +
-        '<div class="timer-detail">' + dDetail + ' · ' + formatTime(lastDiaper.timestamp) + '</div>';
-    } else {
-      diaperHtml =
-        '<div class="timer-label" style="margin-top:16px">距上次尿布</div>' +
-        '<div class="timer-value">--</div>' +
-        '<div class="timer-detail">暂无记录</div>';
-    }
-
-    timerCard.innerHTML = feedingHtml + diaperHtml;
+      '<div class="timer-detail">入睡于 ' + formatTime(activeSleep.sleep_start) + '</div>' +
+      '</div>';
   }
+
+  // Last feeding (milk / meal / snack)
+  var feedingRecords = records.filter(function(r) { return r.type === 'milk' || r.type === 'meal' || r.type === 'snack'; });
+  feedingRecords.sort(function(a, b) { return b.timestamp - a.timestamp; });
+  var lastFeeding = feedingRecords[0];
+
+  // Last diaper
+  var diaperRecs = records.filter(function(r) { return r.type === 'diaper'; });
+  diaperRecs.sort(function(a, b) { return b.timestamp - a.timestamp; });
+  var lastDiaper = diaperRecs[0];
+
+  var feedingHtml = '';
+  if (lastFeeding) {
+    var diff = Date.now() - lastFeeding.timestamp;
+    var h = Math.floor(diff / 3600000);
+    var m = Math.floor((diff % 3600000) / 60000);
+    var detail = lastFeeding.type === 'milk' ? lastFeeding.amount + 'ml' : (lastFeeding.subtype || getTypeName(lastFeeding.type));
+    feedingHtml =
+      '<div class="timer-label" style="margin-top:' + (activeSleep ? '16px' : '0') + '">距上次进食</div>' +
+      '<div class="timer-value" id="timerFeeding">' + h + '小时' + m + '分钟</div>' +
+      '<div class="timer-detail">' + detail + ' · ' + formatTime(lastFeeding.timestamp) + '</div>';
+  } else {
+    feedingHtml =
+      '<div class="timer-label" style="margin-top:' + (activeSleep ? '16px' : '0') + '">距上次进食</div>' +
+      '<div class="timer-value">--</div>' +
+      '<div class="timer-detail">暂无记录</div>';
+  }
+
+  var diaperHtml = '';
+  if (lastDiaper) {
+    var dDiff = Date.now() - lastDiaper.timestamp;
+    var dh = Math.floor(dDiff / 3600000);
+    var dm = Math.floor((dDiff % 3600000) / 60000);
+    var dDetail = lastDiaper.diaper_type || '尿布';
+    diaperHtml =
+      '<div class="timer-label" style="margin-top:16px">距上次尿布</div>' +
+      '<div class="timer-value" id="timerDiaper">' + dh + '小时' + dm + '分钟</div>' +
+      '<div class="timer-detail">' + dDetail + ' · ' + formatTime(lastDiaper.timestamp) + '</div>';
+  } else {
+    diaperHtml =
+      '<div class="timer-label" style="margin-top:16px">距上次尿布</div>' +
+      '<div class="timer-value">--</div>' +
+      '<div class="timer-detail">暂无记录</div>';
+  }
+
+  timerCard.innerHTML = sleepHtml + feedingHtml + diaperHtml;
 
   // Recent 4 records — enhanced card style
   var recent = records.slice().sort(function(a, b) { return b.timestamp - a.timestamp; }).slice(0, 4);
@@ -1646,40 +1647,49 @@ function updateTimer() {
   if (currentPage !== 'dashboard') return;
 
   var activeSleep = window._activeSleep;
+  var sleepSection = document.getElementById('timerSleepSection');
+
+  // Update sleep timer if active, hide section otherwise
   if (activeSleep && activeSleep.sleep_start) {
+    if (sleepSection) sleepSection.style.display = '';
     var timerValue = document.getElementById('timerValue');
-    if (!timerValue) return;
-    var diff = Date.now() - activeSleep.sleep_start;
-    var h = Math.floor(diff / 3600000);
-    var m = Math.floor((diff % 3600000) / 60000);
-    timerValue.textContent = h + '小时' + m + '分钟';
-  } else {
-    var records = getRecords();
-
-    var timerFeeding = document.getElementById('timerFeeding');
-    if (timerFeeding) {
-      var feedingRecords = records.filter(function(r) { return r.type === 'milk' || r.type === 'meal' || r.type === 'snack'; });
-      feedingRecords.sort(function(a, b) { return b.timestamp - a.timestamp; });
-      var last = feedingRecords[0];
-      if (last) {
-        var diff = Date.now() - last.timestamp;
-        var h = Math.floor(diff / 3600000);
-        var m = Math.floor((diff % 3600000) / 60000);
-        timerFeeding.textContent = h + '小时' + m + '分钟';
-      }
+    if (timerValue) {
+      var diff = Date.now() - activeSleep.sleep_start;
+      var h = Math.floor(diff / 3600000);
+      var m = Math.floor((diff % 3600000) / 60000);
+      timerValue.textContent = h + '小时' + m + '分钟';
     }
+  } else {
+    if (sleepSection) sleepSection.style.display = 'none';
+  }
 
-    var timerDiaper = document.getElementById('timerDiaper');
-    if (timerDiaper) {
-      var diaperRecs = records.filter(function(r) { return r.type === 'diaper'; });
-      diaperRecs.sort(function(a, b) { return b.timestamp - a.timestamp; });
-      var lastDiaper = diaperRecs[0];
-      if (lastDiaper) {
-        var dDiff = Date.now() - lastDiaper.timestamp;
-        var dh = Math.floor(dDiff / 3600000);
-        var dm = Math.floor((dDiff % 3600000) / 60000);
-        timerDiaper.textContent = dh + '小时' + dm + '分钟';
-      }
+  var records = getRecords();
+
+  // Update feeding timer
+  var timerFeeding = document.getElementById('timerFeeding');
+  if (timerFeeding) {
+    var feedingRecords = records.filter(function(r) { return r.type === 'milk' || r.type === 'meal' || r.type === 'snack'; });
+    feedingRecords.sort(function(a, b) { return b.timestamp - a.timestamp; });
+    var last = feedingRecords[0];
+    if (last) {
+      var diff = Date.now() - last.timestamp;
+      var h = Math.floor(diff / 3600000);
+      var m = Math.floor((diff % 3600000) / 60000);
+      timerFeeding.textContent = h + '小时' + m + '分钟';
+    }
+  }
+
+  // Update diaper timer
+  var timerDiaper = document.getElementById('timerDiaper');
+  if (timerDiaper) {
+    var diaperRecs = records.filter(function(r) { return r.type === 'diaper'; });
+    diaperRecs.sort(function(a, b) { return b.timestamp - a.timestamp; });
+    var lastDiaper = diaperRecs[0];
+    if (lastDiaper) {
+      var dDiff = Date.now() - lastDiaper.timestamp;
+      var dh = Math.floor(dDiff / 3600000);
+      var dm = Math.floor((dDiff % 3600000) / 60000);
+      timerDiaper.textContent = dh + '小时' + dm + '分钟';
     }
   }
 }
