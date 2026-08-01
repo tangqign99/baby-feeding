@@ -430,8 +430,27 @@ function renderDashboard() {
       '<div class="timer-detail">暂无记录</div>';
   }
 
-  // Recent 4 records — enhanced card style
-  var recent = records.slice().sort(function(a, b) { return b.timestamp - a.timestamp; }).slice(0, 4);
+  // Recent 5 records — filtered: sleep only yesterday daytime + today
+  var now = new Date();
+  var todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  var yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+  var yesterdayDayStart = new Date(yesterday.getFullYear(), yesterday.getMonth(), yesterday.getDate(), 6, 0, 0).getTime();
+  var yesterdayDayEnd = new Date(yesterday.getFullYear(), yesterday.getMonth(), yesterday.getDate(), 18, 0, 0).getTime();
+
+  var allSorted = records.slice().sort(function(a, b) { return b.timestamp - a.timestamp; });
+  var filtered = [];
+  for (var ri = 0; ri < allSorted.length; ri++) {
+    var rec = allSorted[ri];
+    if (rec.type === 'sleep') {
+      var ts = rec.sleep_start || rec.timestamp;
+      if ((ts >= yesterdayDayStart && ts < yesterdayDayEnd) || ts >= todayStart) {
+        filtered.push(rec);
+      }
+    } else {
+      filtered.push(rec);
+    }
+  }
+  var recent = filtered.slice(0, 5);
   var recentHtml = '';
   if (recent.length === 0) {
     recentHtml = '<div style="text-align:center;padding:20px;color:var(--text-light);font-size:14px;">暂无记录，快去录入吧~</div>';
@@ -490,22 +509,29 @@ function renderEntry() {
   var tabsRow1 = [
     { id: 'milk', label: '🍼 奶量' },
     { id: 'meal', label: '🍚 吃饭' },
-    { id: 'snack', label: '🥄 辅食' }
+    { id: 'snack', label: '🥄 辅食' },
+    { id: 'poop', label: '💩 大便' }
   ];
   var tabsRow2 = [
     { id: 'diaper', label: '🧷 尿布' },
-    { id: 'height', label: '📏 身高' },
-    { id: 'weight', label: '⚖️ 体重' },
     { id: 'sleep', label: '💤 睡眠' }
   ];
-  var allTabs = tabsRow1.concat(tabsRow2);
+  var tabsRow3 = [
+    { id: 'height', label: '📏 身高' },
+    { id: 'weight', label: '⚖️ 体重' }
+  ];
+  var allTabs = tabsRow1.concat(tabsRow2).concat(tabsRow3);
 
   var html = '<div class="tab-bar">';
   tabsRow1.forEach(function(t) {
     html += '<button class="tab-btn' + (entryTab === t.id ? ' active' : '') + '" data-tab="' + t.id + '">' + t.label + '</button>';
   });
-  html += '</div><div class="tab-bar tab-bar-row2">';
+  html += '</div><div class="tab-bar tab-bar-2col tab-bar-row2">';
   tabsRow2.forEach(function(t) {
+    html += '<button class="tab-btn' + (entryTab === t.id ? ' active' : '') + '" data-tab="' + t.id + '">' + t.label + '</button>';
+  });
+  html += '</div><div class="tab-bar tab-bar-2col tab-bar-row3">';
+  tabsRow3.forEach(function(t) {
     html += '<button class="tab-btn' + (entryTab === t.id ? ' active' : '') + '" data-tab="' + t.id + '">' + t.label + '</button>';
   });
   html += '</div>';
@@ -1104,6 +1130,104 @@ function renderTimeline() {
 }
 
 // ------- Stats -------
+var sleepFilterMode = '7days';
+var sleepFilterStart = '';
+var sleepFilterEnd = '';
+var diaperFilterMode = '7days';
+var diaperFilterStart = '';
+var diaperFilterEnd = '';
+
+function getDateRange(mode, customStart, customEnd) {
+  var now = new Date();
+  var endTs = now.getTime();
+  var startTs;
+  switch (mode) {
+    case '7days':
+      startTs = endTs - 7 * 86400000;
+      break;
+    case '30days':
+      startTs = endTs - 30 * 86400000;
+      break;
+    case 'month':
+      var monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      startTs = monthStart.getTime();
+      break;
+    case 'custom':
+      if (customStart && customEnd) {
+        startTs = new Date(customStart + 'T00:00:00').getTime();
+        endTs = new Date(customEnd + 'T23:59:59').getTime();
+        if (isNaN(startTs) || isNaN(endTs)) { startTs = endTs - 7 * 86400000; }
+      } else {
+        startTs = endTs - 7 * 86400000;
+      }
+      break;
+    default:
+      startTs = endTs - 7 * 86400000;
+  }
+  return { start: startTs, end: endTs };
+}
+
+function buildFilterHTML(prefix, mode, startVal, endVal) {
+  var modes = [
+    { id: '7days', label: '最近7天' },
+    { id: '30days', label: '最近30天' },
+    { id: 'month', label: '本月' },
+    { id: 'custom', label: '自定义' }
+  ];
+  var capPrefix = prefix.charAt(0).toUpperCase() + prefix.slice(1);
+  var h = '<div class="filter-bar">';
+  modes.forEach(function(m) {
+    h += '<button class="filter-btn' + (mode === m.id ? ' active' : '') +
+      '" onclick="set' + capPrefix + 'Filter(\'' + m.id + '\')">' + m.label + '</button>';
+  });
+  h += '</div>';
+  if (mode === 'custom') {
+    h += '<div class="filter-date-row">' +
+      '<input type="date" id="' + prefix + 'Start" value="' + (startVal || '') + '" title="开始日期">' +
+      '<span style="font-size:12px;color:var(--text-light)">至</span>' +
+      '<input type="date" id="' + prefix + 'End" value="' + (endVal || '') + '" title="结束日期">' +
+      '<button onclick="apply' + capPrefix + 'Custom()">确定</button>' +
+      '</div>';
+  }
+  return h;
+}
+
+function setSleepFilter(mode) {
+  sleepFilterMode = mode;
+  if (mode !== 'custom') { sleepFilterStart = ''; sleepFilterEnd = ''; }
+  renderStats();
+}
+
+function applySleepCustom() {
+  var s = document.getElementById('sleepStart');
+  var e = document.getElementById('sleepEnd');
+  if (s && e && s.value && e.value) {
+    sleepFilterStart = s.value;
+    sleepFilterEnd = e.value;
+    renderStats();
+  } else {
+    toast('请选择完整的日期范围', 'warning');
+  }
+}
+
+function setDiaperFilter(mode) {
+  diaperFilterMode = mode;
+  if (mode !== 'custom') { diaperFilterStart = ''; diaperFilterEnd = ''; }
+  renderStats();
+}
+
+function applyDiaperCustom() {
+  var s = document.getElementById('diaperStart');
+  var e = document.getElementById('diaperEnd');
+  if (s && e && s.value && e.value) {
+    diaperFilterStart = s.value;
+    diaperFilterEnd = e.value;
+    renderStats();
+  } else {
+    toast('请选择完整的日期范围', 'warning');
+  }
+}
+
 function renderStats() {
   var container = document.getElementById('statsContent');
   var records = getRecords();
@@ -1176,9 +1300,15 @@ function renderStats() {
   html += '</div>';
 
   // Sleep records section
-  var sleepRecords = records.filter(function(r) { return r.type === 'sleep'; }).sort(function(a, b) { return b.timestamp - a.timestamp; });
+  var allSleepRecords = records.filter(function(r) { return r.type === 'sleep'; }).sort(function(a, b) { return b.timestamp - a.timestamp; });
+  var sleepRange = getDateRange(sleepFilterMode, sleepFilterStart, sleepFilterEnd);
+  var sleepRecords = allSleepRecords.filter(function(r) {
+    var ts = r.sleep_start || r.timestamp;
+    return ts >= sleepRange.start && ts <= sleepRange.end;
+  });
+  html += '<div class="chart-container"><div class="chart-title">睡眠记录</div>';
+  html += buildFilterHTML('sleep', sleepFilterMode, sleepFilterStart, sleepFilterEnd);
   if (sleepRecords.length > 0) {
-    html += '<div class="chart-container"><div class="chart-title">睡眠记录</div>';
     html += '<div style="overflow-x:auto"><table style="width:100%;font-size:12px;border-collapse:collapse;min-width:360px">';
     html += '<thead><tr style="border-bottom:2px solid #F0E8E8;text-align:left;color:var(--text-light);font-size:11px"><th style="padding:8px 4px">日期</th><th style="padding:8px 4px">入睡</th><th style="padding:8px 4px">醒来</th><th style="padding:8px 4px">时长</th><th style="padding:8px 4px">类型</th></tr></thead><tbody>';
     sleepRecords.forEach(function(r) {
@@ -1202,13 +1332,20 @@ function renderStats() {
         '<td style="padding:8px 4px"><span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600;background:' + tagColor + '18;color:' + tagColor + '">' + typeTag + '</span></td>' +
         '</tr>';
     });
-    html += '</tbody></table></div></div>';
+    html += '</tbody></table></div>';
   } else {
-    html += '<div class="chart-container"><div class="chart-title">睡眠记录</div><div class="stat-empty">暂无睡眠数据</div></div>';
+    html += '<div class="record-empty">暂无睡眠数据</div>';
   }
+  html += '</div>';
 
   // Diaper stats
-  var diaperRecords = records.filter(function(r) { return r.type === 'diaper'; }).sort(function(a, b) { return b.timestamp - a.timestamp; });
+  var allDiaperRecords = records.filter(function(r) { return r.type === 'diaper'; }).sort(function(a, b) { return b.timestamp - a.timestamp; });
+  var diaperRange = getDateRange(diaperFilterMode, diaperFilterStart, diaperFilterEnd);
+  var diaperRecords = allDiaperRecords.filter(function(r) {
+    return r.timestamp >= diaperRange.start && r.timestamp <= diaperRange.end;
+  });
+  html += '<div class="chart-container"><div class="chart-title">尿布统计</div>';
+  html += buildFilterHTML('diaper', diaperFilterMode, diaperFilterStart, diaperFilterEnd);
   if (diaperRecords.length > 0) {
     // Group by date
     var diaperByDate = {};
@@ -1222,7 +1359,6 @@ function renderStats() {
     });
     var diaperDates = Object.keys(diaperByDate).sort(function(a, b) { return b.localeCompare(a); });
 
-    html += '<div class="chart-container"><div class="chart-title">尿布统计</div>';
     html += '<div style="overflow-x:auto"><table style="width:100%;font-size:12px;border-collapse:collapse;min-width:300px">';
     html += '<thead><tr style="border-bottom:2px solid #F0E8E8;text-align:left;color:var(--text-light);font-size:11px"><th style="padding:8px 4px">日期</th><th style="padding:8px 4px">小便</th><th style="padding:8px 4px">大便</th><th style="padding:8px 4px">总计</th></tr></thead><tbody>';
     diaperDates.forEach(function(d) {
@@ -1234,10 +1370,11 @@ function renderStats() {
         '<td style="padding:8px 4px;font-weight:600">' + row.total + '</td>' +
         '</tr>';
     });
-    html += '</tbody></table></div></div>';
+    html += '</tbody></table></div>';
   } else {
-    html += '<div class="chart-container"><div class="chart-title">尿布统计</div><div class="stat-empty">暂无尿布数据</div></div>';
+    html += '<div class="record-empty">暂无尿布数据</div>';
   }
+  html += '</div>';
 
   // H/W line chart with BMI (moved to end)
   html += '<div class="chart-container"><div class="chart-title">身高体重变化</div>';

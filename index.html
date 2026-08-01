@@ -303,6 +303,33 @@ body {
 }
 .btn-danger:active { background:#FFF0F0; }
 .btn-danger-hint { text-align:center; font-size:11px; color:var(--text-light); margin-top:8px; }
+/* Tab bar variants */
+.tab-bar-2col { justify-content:center; }
+.tab-bar-2col .tab-btn { flex:0 0 auto; min-width:100px; }
+.tab-bar-row3 { margin-top:-6px; }
+/* Filter bar */
+.filter-bar {
+  display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px; align-items:center;
+}
+.filter-btn {
+  padding:5px 12px; border:2px solid var(--border); border-radius:16px;
+  background:var(--card); font-size:12px; color:var(--text); cursor:pointer;
+  transition:all 0.15s; font-weight:500;
+}
+.filter-btn.active { border-color:var(--pink); background:#FFF0F0; color:var(--pink); }
+.filter-date-row {
+  display:flex; gap:6px; align-items:center; margin-top:4px; width:100%;
+}
+.filter-date-row input[type="date"] {
+  flex:1; padding:5px 8px; border:2px solid var(--border); border-radius:10px;
+  font-size:12px; outline:none; background:var(--card); color:var(--text);
+}
+.filter-date-row input[type="date"]:focus { border-color:var(--pink); }
+.filter-date-row button {
+  padding:5px 14px; border:none; background:var(--pink); color:#fff;
+  border-radius:12px; font-size:12px; cursor:pointer; font-weight:500;
+}
+.record-empty { text-align:center; padding:16px; color:var(--text-light); font-size:13px; }
 /* Interval Select */
 .interval-select {
   padding:8px 12px; border:2px solid var(--border); border-radius:20px;
@@ -474,11 +501,11 @@ body {
 
 <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-  <script src="./app.js?v=3.14"></script>
+  <script src="./app.js?v=3.15"></script>
   <script>
     // Service Worker 注册
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('./sw.js?v=3.14').then(function(reg) {
+      navigator.serviceWorker.register('./sw.js?v=3.15').then(function(reg) {
         console.log('SW registered:', reg.scope);
       }).catch(function(err) {
         console.log('SW failed:', err);
