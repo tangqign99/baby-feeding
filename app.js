@@ -382,11 +382,11 @@ function renderDashboard() {
   var sleepStr = sleepCount > 0 ? Math.floor(totalSleepMin / 60) + 'h' + (totalSleepMin % 60) + 'm' : '--';
 
   document.getElementById('dashSummary').innerHTML =
-    '<div class="dash-milk-hero"><div class="hero-value">' + totalMilk + '<span class="unit">ml</span></div><div class="label">今日奶量</div></div>' +
+    '<div class="dash-milk-hero" style="cursor:pointer" onclick="showTodayDetail(\'milk\')"><div class="hero-value">' + totalMilk + '<span class="unit">ml</span></div><div class="label">今日奶量</div></div>' +
     '<div class="dash-sub-row" style="grid-template-columns:repeat(3,1fr)">' +
-    '<div class="dash-item"><div class="value">' + mealCount + '<span class="unit">次</span></div><div class="label">吃饭</div></div>' +
-    '<div class="dash-item"><div class="value">' + sleepStr + '</div><div class="label">睡眠</div></div>' +
-    '<div class="dash-item"><div class="value">' + diaperCount + '<span class="unit">次</span></div><div class="label">尿布</div></div>' +
+    '<div class="dash-item" style="cursor:pointer" onclick="showTodayDetail(\'meal\')"><div class="value">' + mealCount + '<span class="unit">次</span></div><div class="label">吃饭</div></div>' +
+    '<div class="dash-item" style="cursor:pointer" onclick="showTodayDetail(\'sleep\')"><div class="value">' + sleepStr + '</div><div class="label">睡眠</div></div>' +
+    '<div class="dash-item" style="cursor:pointer" onclick="showTodayDetail(\'diaper\')"><div class="value">' + diaperCount + '<span class="unit">次</span></div><div class="label">尿布</div></div>' +
     '</div>';
 
   // Timer: check for active sleep first
@@ -500,6 +500,61 @@ function buildRecordDesc(r) {
   return '';
 }
 
+function showTodayDetail(type) {
+  var existing = document.getElementById('todayDetailPopup');
+  if (existing) existing.remove();
+
+  var today = formatDate(Date.now());
+  var records = getRecords();
+  var typeNames = { milk: '奶量', meal: '吃饭', snack: '辅食', sleep: '睡眠', diaper: '尿布' };
+  var typeName = typeNames[type] || getTypeName(type);
+
+  var dayRecords;
+  if (type === 'meal') {
+    dayRecords = records.filter(function(r) {
+      return (r.type === 'meal' || r.type === 'snack') && formatDate(r.timestamp) === today;
+    }).sort(function(a, b) { return a.timestamp - b.timestamp; });
+  } else {
+    dayRecords = records.filter(function(r) {
+      return r.type === type && formatDate(r.timestamp) === today;
+    }).sort(function(a, b) { return a.timestamp - b.timestamp; });
+  }
+
+  var title = '今日' + typeName + '详情';
+
+  var html = '<div class="modal-overlay show" id="todayDetailPopup" onclick="closeTodayDetail(event)">' +
+    '<div class="modal-box" style="max-height:70vh;overflow-y:auto" onclick="event.stopPropagation()">' +
+    '<h3 style="margin-bottom:12px">' + title + '</h3>';
+
+  if (dayRecords.length === 0) {
+    html += '<div style="text-align:center;padding:20px;color:var(--text-light)">今日暂无' + typeName + '记录</div>';
+  } else {
+    html += '<table style="width:100%;font-size:13px;border-collapse:collapse">';
+    html += '<thead><tr style="border-bottom:2px solid #F0E8E8;text-align:left;color:var(--text-light);font-size:11px"><th style="padding:8px 4px">时间</th><th style="padding:8px 4px">详情</th><th style="padding:8px 4px">备注</th></tr></thead><tbody>';
+    dayRecords.forEach(function(r) {
+      var detail = buildRecordDesc(r);
+      html += '<tr style="border-bottom:1px solid var(--border)">' +
+        '<td style="padding:8px 4px;white-space:nowrap">' + formatTime(r.timestamp) + '</td>' +
+        '<td style="padding:8px 4px;font-weight:600;color:var(--pink)">' + detail + '</td>' +
+        '<td style="padding:8px 4px;color:var(--text-light);font-size:12px">' + (r.note || '') + '</td>' +
+        '</tr>';
+    });
+    html += '</tbody></table>';
+  }
+
+  html += '<div class="btn-row" style="margin-top:16px">' +
+    '<button class="btn-confirm" onclick="document.getElementById(\'todayDetailPopup\').remove()" style="flex:1;padding:10px;border-radius:20px;font-size:14px;border:none;background:var(--pink);color:#fff;cursor:pointer">关闭</button>' +
+    '</div></div></div>';
+
+  document.body.insertAdjacentHTML('beforeend', html);
+}
+
+function closeTodayDetail(e) {
+  if (e && e.target !== document.getElementById('todayDetailPopup')) return;
+  var el = document.getElementById('todayDetailPopup');
+  if (el) el.remove();
+}
+
 // ------- Entry -------
 var entryTab = 'milk';
 var selectedPreset = '';
@@ -509,8 +564,7 @@ function renderEntry() {
   var tabsRow1 = [
     { id: 'milk', label: '🍼 奶量' },
     { id: 'meal', label: '🍚 吃饭' },
-    { id: 'snack', label: '🥄 辅食' },
-    { id: 'poop', label: '💩 大便' }
+    { id: 'snack', label: '🥄 辅食' }
   ];
   var tabsRow2 = [
     { id: 'diaper', label: '🧷 尿布' },
@@ -526,11 +580,11 @@ function renderEntry() {
   tabsRow1.forEach(function(t) {
     html += '<button class="tab-btn' + (entryTab === t.id ? ' active' : '') + '" data-tab="' + t.id + '">' + t.label + '</button>';
   });
-  html += '</div><div class="tab-bar tab-bar-2col tab-bar-row2">';
+  html += '</div><div class="tab-bar tab-bar-row2">';
   tabsRow2.forEach(function(t) {
     html += '<button class="tab-btn' + (entryTab === t.id ? ' active' : '') + '" data-tab="' + t.id + '">' + t.label + '</button>';
   });
-  html += '</div><div class="tab-bar tab-bar-2col tab-bar-row3">';
+  html += '</div><div class="tab-bar tab-bar-row3">';
   tabsRow3.forEach(function(t) {
     html += '<button class="tab-btn' + (entryTab === t.id ? ' active' : '') + '" data-tab="' + t.id + '">' + t.label + '</button>';
   });
@@ -657,7 +711,7 @@ function renderEntryContent() {
           '<div style="margin-top:20px;border-top:1px solid var(--border);padding-top:16px">' +
           '<label style="display:block;font-size:13px;color:var(--text-light);margin-bottom:6px;">或选择入睡时间</label>' +
           '<input type="datetime-local" id="sleepStartTime" value="' + nowLocal + '" style="width:100%;max-width:260px;padding:12px;border:2px solid var(--border);border-radius:var(--radius-sm);font-size:15px;outline:none;background:var(--card);color:var(--text);margin-bottom:10px;text-align:center;">' +
-          '<br><button class="btn-primary" onclick="recordSleepStart(document.getElementById(\'sleepStartTime\').value)" style="background:var(--blue);font-size:15px;padding:12px 32px;border-radius:24px">按时间入睡</button>' +
+          '<br><button class="btn-primary" onclick="recordSleepStart(document.getElementById(\'sleepStartTime\').value)" style="background:var(--pink);font-size:15px;padding:12px 32px;border-radius:24px">按时间入睡</button>' +
           '</div>' +
           '<div style="margin-top:12px">' +
           '<button onclick="showManualSleep()" style="border:none;background:none;color:var(--text-light);font-size:13px;padding:8px;cursor:pointer;text-decoration:underline">或手动录入完整睡眠</button>' +
@@ -1351,13 +1405,18 @@ function renderStats() {
     var diaperByDate = {};
     diaperRecords.forEach(function(r) {
       var d = formatDate(r.timestamp);
-      if (!diaperByDate[d]) diaperByDate[d] = { pee: 0, poop: 0, total: 0 };
+      if (!diaperByDate[d]) diaperByDate[d] = { pee: 0, poop: 0, total: 0, records: [] };
       var dt = r.diaper_type || '';
       if (dt === '小便') diaperByDate[d].pee += 1;
       else if (dt === '大便') diaperByDate[d].poop += 1;
       diaperByDate[d].total += 1;
+      diaperByDate[d].records.push(r);
     });
-    var diaperDates = Object.keys(diaperByDate).sort(function(a, b) { return b.localeCompare(a); });
+    var diaperDates = Object.keys(diaperByDate).sort(function(a, b) { return a.localeCompare(b); });
+
+    // Bar chart
+    html += '<canvas id="diaperChart" width="320" height="180" style="width:100%;max-width:420px"></canvas>';
+    html += '<div style="text-align:center;font-size:11px;color:var(--text-light);margin:4px 0 10px">点击柱子查看当天详情</div>';
 
     html += '<div style="overflow-x:auto"><table style="width:100%;font-size:12px;border-collapse:collapse;min-width:300px">';
     html += '<thead><tr style="border-bottom:2px solid #F0E8E8;text-align:left;color:var(--text-light);font-size:11px"><th style="padding:8px 4px">日期</th><th style="padding:8px 4px">小便</th><th style="padding:8px 4px">大便</th><th style="padding:8px 4px">总计</th></tr></thead><tbody>';
@@ -1371,8 +1430,12 @@ function renderStats() {
         '</tr>';
     });
     html += '</tbody></table></div>';
+
+    // Store for chart drawing
+    window._diaperChartData = { dates: diaperDates, data: diaperByDate };
   } else {
     html += '<div class="record-empty">暂无尿布数据</div>';
+    window._diaperChartData = null;
   }
   html += '</div>';
 
@@ -1395,6 +1458,7 @@ function renderStats() {
   container.innerHTML = html;
 
   if (hasMilk) drawMilkChart(days, milkValues, maxMilk);
+  if (window._diaperChartData) drawDiaperChart(window._diaperChartData);
   if (hwChartData.length >= 2) drawHWChartV2(hwChartData);
 }
 
@@ -1539,6 +1603,144 @@ function showDayMilkDetail(dateStr) {
 function closeMilkDetail(e) {
   if (e && e.target !== document.getElementById('milkDetailPopup')) return;
   var el = document.getElementById('milkDetailPopup');
+  if (el) el.remove();
+}
+
+function drawDiaperChart(chartData) {
+  var canvas = document.getElementById('diaperChart');
+  if (!canvas) return;
+  var ctx = canvas.getContext('2d');
+  var dpr = window.devicePixelRatio || 1;
+  var rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = 180 * dpr;
+  ctx.scale(dpr, dpr);
+  canvas.style.height = '180px';
+
+  var w = rect.width;
+  var h = 180;
+  var pad = { top: 16, right: 12, bottom: 28, left: 40 };
+  var cw = w - pad.left - pad.right;
+  var ch = h - pad.top - pad.bottom;
+
+  var dates = chartData.dates;
+  var data = chartData.data;
+  var barW = Math.max(14, Math.min(32, cw / dates.length * 0.6));
+  var gap = (cw - barW * dates.length) / (dates.length + 1);
+
+  // Find max total for scale
+  var maxTotal = 0;
+  dates.forEach(function(d) { if (data[d].total > maxTotal) maxTotal = data[d].total; });
+  if (maxTotal === 0) maxTotal = 1;
+
+  ctx.clearRect(0, 0, w, h);
+
+  ctx.strokeStyle = '#F0E8E8';
+  ctx.lineWidth = 1;
+  var gridLines = 4;
+  for (var i = 0; i <= gridLines; i++) {
+    var y = pad.top + (ch / gridLines) * i;
+    ctx.beginPath();
+    ctx.moveTo(pad.left, y);
+    ctx.lineTo(w - pad.right, y);
+    ctx.stroke();
+    ctx.fillStyle = '#888';
+    ctx.font = '11px sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText(Math.round((maxTotal / gridLines) * (gridLines - i)), pad.left - 6, y + 4);
+  }
+
+  window._diaperBarPositions = [];
+
+  dates.forEach(function(d, i) {
+    var val = data[d].total;
+    var barH = val / maxTotal * ch;
+    var x = pad.left + gap + i * (barW + gap);
+    var y = pad.top + ch - barH;
+
+    var gradient = ctx.createLinearGradient(x, y, x, pad.top + ch);
+    gradient.addColorStop(0, '#C7CEEA');
+    gradient.addColorStop(1, '#B5EAD7');
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.roundRect(x, y, barW, barH, [4, 4, 0, 0]);
+    ctx.fill();
+
+    if (val > 0) {
+      ctx.fillStyle = '#4A4A4A';
+      ctx.font = '10px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(val, x + barW / 2, y - 4);
+    }
+
+    ctx.fillStyle = '#888';
+    ctx.font = '10px sans-serif';
+    ctx.textAlign = 'center';
+    var dateLabel = (parseInt(d.slice(8, 10), 10)) + '日';
+    ctx.fillText(dateLabel, x + barW / 2, pad.top + ch + 18);
+
+    window._diaperBarPositions.push({ date: d, x: x, w: barW });
+  });
+
+  canvas.style.cursor = 'pointer';
+  canvas.onclick = function(e) {
+    var cr = canvas.getBoundingClientRect();
+    var clickX = e.clientX - cr.left;
+    var bars = window._diaperBarPositions;
+    if (!bars) return;
+    for (var j = 0; j < bars.length; j++) {
+      var b = bars[j];
+      if (clickX >= b.x - 6 && clickX <= b.x + b.w + 6) {
+        showDayDiaperDetail(b.date);
+        return;
+      }
+    }
+  };
+}
+
+function showDayDiaperDetail(dateStr) {
+  var existing = document.getElementById('diaperDetailPopup');
+  if (existing) existing.remove();
+
+  var records = getRecords();
+  var dayRecords = records.filter(function(r) {
+    return r.type === 'diaper' && formatDate(r.timestamp) === dateStr;
+  }).sort(function(a, b) { return a.timestamp - b.timestamp; });
+
+  var d = new Date(dateStr + 'T00:00:00');
+  var title = (d.getMonth() + 1) + '月' + d.getDate() + '日 尿布详情';
+
+  var html = '<div class="modal-overlay show" id="diaperDetailPopup" onclick="closeDiaperDetail(event)">' +
+    '<div class="modal-box" style="max-height:70vh;overflow-y:auto" onclick="event.stopPropagation()">' +
+    '<h3 style="margin-bottom:12px">' + title + '</h3>';
+
+  if (dayRecords.length === 0) {
+    html += '<div style="text-align:center;padding:20px;color:var(--text-light)">当天无尿布记录</div>';
+  } else {
+    html += '<table style="width:100%;font-size:13px;border-collapse:collapse">';
+    html += '<thead><tr style="border-bottom:2px solid #F0E8E8;text-align:left;color:var(--text-light);font-size:11px"><th style="padding:8px 4px">时间</th><th style="padding:8px 4px">类型</th><th style="padding:8px 4px">备注</th></tr></thead><tbody>';
+    dayRecords.forEach(function(r) {
+      var dt = r.diaper_type || '尿布';
+      var icon = dt === '小便' ? '💧' : (dt === '大便' ? '💩' : '🧷');
+      html += '<tr style="border-bottom:1px solid var(--border)">' +
+        '<td style="padding:8px 4px;white-space:nowrap">' + formatTime(r.timestamp) + '</td>' +
+        '<td style="padding:8px 4px;font-weight:600;color:var(--pink)">' + icon + ' ' + dt + '</td>' +
+        '<td style="padding:8px 4px;color:var(--text-light);font-size:12px">' + (r.note || '') + '</td>' +
+        '</tr>';
+    });
+    html += '</tbody></table>';
+  }
+
+  html += '<div class="btn-row" style="margin-top:16px">' +
+    '<button class="btn-confirm" onclick="document.getElementById(\'diaperDetailPopup\').remove()" style="flex:1;padding:10px;border-radius:20px;font-size:14px;border:none;background:var(--pink);color:#fff;cursor:pointer">关闭</button>' +
+    '</div></div></div>';
+
+  document.body.insertAdjacentHTML('beforeend', html);
+}
+
+function closeDiaperDetail(e) {
+  if (e && e.target !== document.getElementById('diaperDetailPopup')) return;
+  var el = document.getElementById('diaperDetailPopup');
   if (el) el.remove();
 }
 

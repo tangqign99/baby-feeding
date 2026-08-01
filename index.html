@@ -466,6 +466,12 @@ body {
         <button onclick="exportLast30()">导出近30天</button>
       </div>
     </div>
+    <div class="card">
+      <div class="setting-item" style="cursor:pointer" onclick="navigateTo('timeline')">
+        <div class="label">查看时间线</div>
+        <div class="hint">📋 浏览所有喂养记录</div>
+      </div>
+    </div>
     <div class="btn-danger-hint">清空后不可恢复，请谨慎操作</div>
     <button class="btn-danger" onclick="clearAllData()">清空所有数据</button>
     <div style="text-align:center;padding:16px;font-size:12px;color:var(--text-light)">
@@ -483,10 +489,6 @@ body {
       <div class="icon">✏️</div>
       <div class="text">录入</div>
     </div>
-    <div class="nav-item" data-page="timeline">
-      <div class="icon">📋</div>
-      <div class="text">时间线</div>
-    </div>
     <div class="nav-item" data-page="stats">
       <div class="icon">📊</div>
       <div class="text">统计</div>
@@ -501,11 +503,11 @@ body {
 
 <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-  <script src="./app.js?v=3.15"></script>
+  <script src="./app.js?v=3.16"></script>
   <script>
     // Service Worker 注册
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('./sw.js?v=3.15').then(function(reg) {
+      navigator.serviceWorker.register('./sw.js?v=3.16').then(function(reg) {
         console.log('SW registered:', reg.scope);
       }).catch(function(err) {
         console.log('SW failed:', err);
