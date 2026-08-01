@@ -383,10 +383,9 @@ function renderDashboard() {
 
   document.getElementById('dashSummary').innerHTML =
     '<div class="dash-milk-hero"><div class="hero-value">' + totalMilk + '<span class="unit">ml</span></div><div class="label">今日奶量</div></div>' +
-    '<div class="dash-sub-row">' +
+    '<div class="dash-sub-row" style="grid-template-columns:repeat(3,1fr)">' +
     '<div class="dash-item"><div class="value">' + mealCount + '<span class="unit">次</span></div><div class="label">吃饭</div></div>' +
     '<div class="dash-item"><div class="value">' + sleepStr + '</div><div class="label">睡眠</div></div>' +
-    '<div class="dash-item"><div class="value">' + poopCount + '<span class="unit">次</span></div><div class="label">大便</div></div>' +
     '<div class="dash-item"><div class="value">' + diaperCount + '<span class="unit">次</span></div><div class="label">尿布</div></div>' +
     '</div>';
 
@@ -491,8 +490,7 @@ function renderEntry() {
   var tabsRow1 = [
     { id: 'milk', label: '🍼 奶量' },
     { id: 'meal', label: '🍚 吃饭' },
-    { id: 'snack', label: '🥄 辅食' },
-    { id: 'poop', label: '💩 大便' }
+    { id: 'snack', label: '🥄 辅食' }
   ];
   var tabsRow2 = [
     { id: 'diaper', label: '🧷 尿布' },
@@ -612,11 +610,16 @@ function renderEntryContent() {
         var sleepDiff = Date.now() - activeSleep.sleep_start;
         var sh = Math.floor(sleepDiff / 3600000);
         var sm = Math.floor((sleepDiff % 3600000) / 60000);
+        var nowLocal = toDatetimeLocal(Date.now());
         container.innerHTML =
           '<div style="text-align:center;padding:16px 0">' +
           '<div style="font-size:14px;color:var(--text-light);margin-bottom:8px">宝宝正在睡觉</div>' +
           '<div style="font-size:42px;font-weight:700;color:var(--pink);margin-bottom:4px">' + sh + '小时' + sm + '分钟</div>' +
-          '<div style="font-size:13px;color:var(--text-light);margin-bottom:24px">入睡于 ' + formatTime(activeSleep.sleep_start) + '</div>' +
+          '<div style="font-size:13px;color:var(--text-light);margin-bottom:16px">入睡于 ' + formatTime(activeSleep.sleep_start) + '</div>' +
+          '<div style="margin-bottom:12px">' +
+          '<label style="display:block;font-size:12px;color:var(--text-light);margin-bottom:4px;">醒来时间（可选）</label>' +
+          '<input type="datetime-local" id="sleepEndTime" value="' + nowLocal + '" style="width:100%;max-width:260px;padding:12px;border:2px solid var(--border);border-radius:var(--radius-sm);font-size:15px;outline:none;background:var(--card);color:var(--text);text-align:center;">' +
+          '</div>' +
           '<button class="btn-primary" onclick="recordSleepEnd()" style="margin-bottom:10px">宝宝醒了</button>' +
           '<br><button onclick="showManualSleep()" style="border:none;background:none;color:var(--text-light);font-size:13px;padding:8px;cursor:pointer;text-decoration:underline">或手动录入完整睡眠</button>' +
           '</div>';
@@ -646,7 +649,7 @@ function renderEntryContent() {
         '</div>' +
         datetimeRowHtml() +
         '<button class="btn-primary" onclick="recordDiaper()">记录尿布</button>';
-      buildPresetGrid(['小便', '大便', '混合'], '');
+      buildPresetGrid(['小便', '大便'], '');
       break;
 
     case 'poop':
@@ -757,16 +760,25 @@ async function recordMeal() {
   var noteEl = document.getElementById('mealNote');
   var note = noteEl ? noteEl.value.trim() : '';
 
+  // Read portion directly from DOM for reliability
+  var portionBtn = document.querySelector('#entryContent .portion-btn.selected');
+  var portion = portionBtn ? portionBtn.textContent.trim() : '';
+
   var record = {
     type: 'meal',
     subtype: subtype,
-    portion: selectedPortion || undefined,
+    portion: portion || null,
     timestamp: getEntryTimestamp(),
     note: note
   };
 
-  await saveRecord(record);
-  toast('记录成功：' + subtype + ' 🍚', 'success');
+  try {
+    await saveRecord(record);
+    toast('记录成功：' + subtype + ' 🍚', 'success');
+  } catch (e) {
+    toast('保存失败：' + e.message, 'warning');
+    return;
+  }
   entryTab = 'meal';
   selectedPreset = '';
   selectedPortion = '';
@@ -785,16 +797,25 @@ async function recordSnack() {
   var noteEl = document.getElementById('snackNote');
   var note = noteEl ? noteEl.value.trim() : '';
 
+  // Read portion directly from DOM for reliability
+  var portionBtn = document.querySelector('#entryContent .portion-btn.selected');
+  var portion = portionBtn ? portionBtn.textContent.trim() : '';
+
   var record = {
     type: 'snack',
     subtype: subtype,
-    portion: selectedPortion || undefined,
+    portion: portion || null,
     timestamp: getEntryTimestamp(),
     note: note
   };
 
-  await saveRecord(record);
-  toast('记录成功：' + subtype + ' 🥄', 'success');
+  try {
+    await saveRecord(record);
+    toast('记录成功：' + subtype + ' 🥄', 'success');
+  } catch (e) {
+    toast('保存失败：' + e.message, 'warning');
+    return;
+  }
   entryTab = 'snack';
   selectedPreset = '';
   selectedPortion = '';
@@ -927,7 +948,16 @@ async function recordSleepEnd() {
   var activeSleep = getActiveSleep();
   if (!activeSleep) { toast('没有进行中的睡眠记录', 'warning'); return; }
 
+  // Use custom wake-up time if provided
+  var endEl = document.getElementById('sleepEndTime');
   var now = Date.now();
+  if (endEl && endEl.value) {
+    var customTs = new Date(endEl.value).getTime();
+    if (!isNaN(customTs) && customTs > activeSleep.sleep_start) {
+      now = customTs;
+    }
+  }
+
   var dur = now - activeSleep.sleep_start;
   var sh = Math.floor(dur / 3600000);
   var sm = Math.floor((dur % 3600000) / 60000);
@@ -1139,6 +1169,7 @@ function renderStats() {
   html += '<div class="chart-container"><div class="chart-title">近7天奶量 (ml)</div>';
   if (hasMilk) {
     html += '<canvas id="milkChart" width="320" height="180" style="width:100%;max-width:420px"></canvas>';
+    html += '<div style="text-align:center;font-size:11px;color:var(--text-light);margin-top:4px">点击柱子查看当天详情</div>';
   } else {
     html += '<div class="stat-empty">暂无奶量数据</div>';
   }
@@ -1183,25 +1214,23 @@ function renderStats() {
     var diaperByDate = {};
     diaperRecords.forEach(function(r) {
       var d = formatDate(r.timestamp);
-      if (!diaperByDate[d]) diaperByDate[d] = { pee: 0, poop: 0, mixed: 0, total: 0 };
+      if (!diaperByDate[d]) diaperByDate[d] = { pee: 0, poop: 0, total: 0 };
       var dt = r.diaper_type || '';
       if (dt === '小便') diaperByDate[d].pee += 1;
       else if (dt === '大便') diaperByDate[d].poop += 1;
-      else if (dt === '混合') diaperByDate[d].mixed += 1;
       diaperByDate[d].total += 1;
     });
     var diaperDates = Object.keys(diaperByDate).sort(function(a, b) { return b.localeCompare(a); });
 
     html += '<div class="chart-container"><div class="chart-title">尿布统计</div>';
-    html += '<div style="overflow-x:auto"><table style="width:100%;font-size:12px;border-collapse:collapse;min-width:360px">';
-    html += '<thead><tr style="border-bottom:2px solid #F0E8E8;text-align:left;color:var(--text-light);font-size:11px"><th style="padding:8px 4px">日期</th><th style="padding:8px 4px">小便</th><th style="padding:8px 4px">大便</th><th style="padding:8px 4px">混合</th><th style="padding:8px 4px">总计</th></tr></thead><tbody>';
+    html += '<div style="overflow-x:auto"><table style="width:100%;font-size:12px;border-collapse:collapse;min-width:300px">';
+    html += '<thead><tr style="border-bottom:2px solid #F0E8E8;text-align:left;color:var(--text-light);font-size:11px"><th style="padding:8px 4px">日期</th><th style="padding:8px 4px">小便</th><th style="padding:8px 4px">大便</th><th style="padding:8px 4px">总计</th></tr></thead><tbody>';
     diaperDates.forEach(function(d) {
       var row = diaperByDate[d];
       html += '<tr style="border-bottom:1px solid var(--border)">' +
         '<td style="padding:8px 4px;white-space:nowrap">' + d + '</td>' +
         '<td style="padding:8px 4px">' + row.pee + '</td>' +
         '<td style="padding:8px 4px">' + row.poop + '</td>' +
-        '<td style="padding:8px 4px">' + row.mixed + '</td>' +
         '<td style="padding:8px 4px;font-weight:600">' + row.total + '</td>' +
         '</tr>';
     });
@@ -1269,6 +1298,9 @@ function drawMilkChart(days, values, max) {
     ctx.fillText(Math.round((max / gridLines) * (gridLines - i)), pad.left - 6, y + 4);
   }
 
+  // Store bar positions for click detection
+  window._milkBarPositions = [];
+
   days.forEach(function(d, i) {
     var val = values[i];
     var barH = val / max * ch;
@@ -1283,6 +1315,10 @@ function drawMilkChart(days, values, max) {
     ctx.roundRect(x, y, barW, barH, [4, 4, 0, 0]);
     ctx.fill();
 
+    // Cursor hint - make bars clickable
+    ctx.fillStyle = 'rgba(0,0,0,0)';
+    ctx.fillRect(x - 4, pad.top, barW + 8, ch);
+
     if (val > 0) {
       ctx.fillStyle = '#4A4A4A';
       ctx.font = '10px sans-serif';
@@ -1295,7 +1331,78 @@ function drawMilkChart(days, values, max) {
     ctx.textAlign = 'center';
     var dateLabel = (parseInt(d.slice(8, 10), 10)) + '日';
     ctx.fillText(dateLabel, x + barW / 2, pad.top + ch + 18);
+
+    // Store position
+    window._milkBarPositions.push({ date: d, x: x, w: barW });
   });
+
+  // Add click handler
+  canvas.style.cursor = 'pointer';
+  canvas.onclick = function(e) {
+    var cr = canvas.getBoundingClientRect();
+    var clickX = e.clientX - cr.left;
+    var clickY = e.clientY - cr.top;
+    var bars = window._milkBarPositions;
+    if (!bars) return;
+    for (var j = 0; j < bars.length; j++) {
+      var b = bars[j];
+      if (clickX >= b.x - 6 && clickX <= b.x + b.w + 6) {
+        showDayMilkDetail(b.date);
+        return;
+      }
+    }
+  };
+}
+
+function showDayMilkDetail(dateStr) {
+  // Remove existing detail popup if any
+  var existing = document.getElementById('milkDetailPopup');
+  if (existing) existing.remove();
+
+  var records = getRecords();
+  var dayRecords = records.filter(function(r) {
+    return r.type === 'milk' && formatDate(r.timestamp) === dateStr;
+  }).sort(function(a, b) { return a.timestamp - b.timestamp; });
+
+  var d = new Date(dateStr + 'T00:00:00');
+  var title = (d.getMonth() + 1) + '月' + d.getDate() + '日 奶量详情';
+
+  var html = '<div class="modal-overlay show" id="milkDetailPopup" onclick="closeMilkDetail(event)">' +
+    '<div class="modal-box" style="max-height:70vh;overflow-y:auto" onclick="event.stopPropagation()">' +
+    '<h3 style="margin-bottom:12px">' + title + '</h3>';
+
+  if (dayRecords.length === 0) {
+    html += '<div style="text-align:center;padding:20px;color:var(--text-light)">当天无奶量记录</div>';
+  } else {
+    var totalDay = 0;
+    html += '<table style="width:100%;font-size:13px;border-collapse:collapse">';
+    html += '<thead><tr style="border-bottom:2px solid #F0E8E8;text-align:left;color:var(--text-light);font-size:11px"><th style="padding:8px 4px">时间</th><th style="padding:8px 4px">奶量</th><th style="padding:8px 4px">备注</th></tr></thead><tbody>';
+    dayRecords.forEach(function(r) {
+      totalDay += (r.amount || 0);
+      html += '<tr style="border-bottom:1px solid var(--border)">' +
+        '<td style="padding:8px 4px;white-space:nowrap">' + formatTime(r.timestamp) + '</td>' +
+        '<td style="padding:8px 4px;font-weight:600;color:var(--pink)">' + (r.amount || 0) + ' ml</td>' +
+        '<td style="padding:8px 4px;color:var(--text-light);font-size:12px">' + (r.note || '') + '</td>' +
+        '</tr>';
+    });
+    html += '<tr style="font-weight:700;border-top:2px solid var(--border)">' +
+      '<td style="padding:10px 4px">当日合计</td>' +
+      '<td style="padding:10px 4px;color:var(--pink)">' + totalDay + ' ml</td>' +
+      '<td></td></tr>';
+    html += '</tbody></table>';
+  }
+
+  html += '<div class="btn-row" style="margin-top:16px">' +
+    '<button class="btn-confirm" onclick="document.getElementById(\'milkDetailPopup\').remove()" style="flex:1;padding:10px;border-radius:20px;font-size:14px;border:none;background:var(--pink);color:#fff;cursor:pointer">关闭</button>' +
+    '</div></div></div>';
+
+  document.body.insertAdjacentHTML('beforeend', html);
+}
+
+function closeMilkDetail(e) {
+  if (e && e.target !== document.getElementById('milkDetailPopup')) return;
+  var el = document.getElementById('milkDetailPopup');
+  if (el) el.remove();
 }
 
 function drawHWChartV2(data) {
