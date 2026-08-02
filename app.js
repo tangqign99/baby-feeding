@@ -123,7 +123,11 @@ async function saveRecord(record) {
     if (error) throw error;
     if (data && data.length > 0) {
       normalizeTimestamps(data);
-      cachedRecords.unshift(data[0]);
+      // 去重：realtime 订阅可能已提前将同一条记录插入缓存
+      var exists = cachedRecords.some(function(r) { return r.id === data[0].id; });
+      if (!exists) {
+        cachedRecords.unshift(data[0]);
+      }
     } else {
       cachedRecords.unshift(cleanRecord);
     }
@@ -847,10 +851,10 @@ async function recordMeal() {
   var record = {
     type: 'meal',
     subtype: subtype,
-    portion: portion || null,
     timestamp: getEntryTimestamp(),
     note: note
   };
+  if (portion) record.portion = portion;
 
   try {
     await saveRecord(record);
@@ -884,10 +888,10 @@ async function recordSnack() {
   var record = {
     type: 'snack',
     subtype: subtype,
-    portion: portion || null,
     timestamp: getEntryTimestamp(),
     note: note
   };
+  if (portion) record.portion = portion;
 
   try {
     await saveRecord(record);
@@ -1184,10 +1188,10 @@ function renderTimeline() {
 }
 
 // ------- Stats -------
-var sleepFilterMode = '7days';
+var sleepFilterMode = '2days';
 var sleepFilterStart = '';
 var sleepFilterEnd = '';
-var diaperFilterMode = '7days';
+var diaperFilterMode = '2days';
 var diaperFilterStart = '';
 var diaperFilterEnd = '';
 
@@ -1196,6 +1200,9 @@ function getDateRange(mode, customStart, customEnd) {
   var endTs = now.getTime();
   var startTs;
   switch (mode) {
+    case '2days':
+      startTs = endTs - 2 * 86400000;
+      break;
     case '7days':
       startTs = endTs - 7 * 86400000;
       break;
@@ -1223,6 +1230,7 @@ function getDateRange(mode, customStart, customEnd) {
 
 function buildFilterHTML(prefix, mode, startVal, endVal) {
   var modes = [
+    { id: '2days', label: '最近2天' },
     { id: '7days', label: '最近7天' },
     { id: '30days', label: '最近30天' },
     { id: 'month', label: '本月' },
@@ -1412,7 +1420,7 @@ function renderStats() {
       diaperByDate[d].total += 1;
       diaperByDate[d].records.push(r);
     });
-    var diaperDates = Object.keys(diaperByDate).sort(function(a, b) { return a.localeCompare(b); });
+    var diaperDates = Object.keys(diaperByDate).sort(function(a, b) { return b.localeCompare(a); });
 
     // Bar chart
     html += '<canvas id="diaperChart" width="320" height="180" style="width:100%;max-width:420px"></canvas>';
@@ -1767,7 +1775,7 @@ function drawHWChartV2(data) {
   if (!drawHeight && !drawWeight) return;
 
   var allHVals = data.filter(function(d) { return d.height !== undefined; }).map(function(d) { return d.height; });
-  var allWVals = data.filter(function(d) { return d.weight !== undefined; }).map(function(d) { return d.weight * 10; });
+  var allWVals = data.filter(function(d) { return d.weight !== undefined; }).map(function(d) { return d.weight; });
 
   var allVals = allHVals.concat(allWVals);
   if (allVals.length === 0) return;
@@ -1820,10 +1828,10 @@ function drawHWChartV2(data) {
     var wPoints = [];
     for (var k2 = 0; k2 < data.length; k2++) {
       if (data[k2].weight !== undefined) {
-        wPoints.push({ x: pad.left + k2 * xGap, y: pad.top + ch - (data[k2].weight * 10 - minVal) / (maxVal - minVal) * ch, val: data[k2].weight });
+        wPoints.push({ x: pad.left + k2 * xGap, y: pad.top + ch - (data[k2].weight - minVal) / (maxVal - minVal) * ch, val: data[k2].weight });
       }
     }
-    drawLine(ctx, wPoints, '#5BA4CF', '体重(x10斤)');
+    drawLine(ctx, wPoints, '#5BA4CF', '体重(斤)');
   }
 
   ctx.font = '11px sans-serif';
@@ -1834,7 +1842,7 @@ function drawHWChartV2(data) {
   }
   if (drawWeight) {
     ctx.fillStyle = '#5BA4CF';
-    ctx.fillText('● 体重(x10斤)', drawHeight ? pad.left + 100 : pad.left, legendY);
+    ctx.fillText('● 体重(斤)', drawHeight ? pad.left + 100 : pad.left, legendY);
   }
 }
 
