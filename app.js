@@ -1,5 +1,5 @@
 /* ============================================
-   宝宝喂养记录 PWA - 应用逻辑 v3.19 (Supabase)
+   宝宝喂养记录 PWA - 应用逻辑 v3.20 (Supabase)
    ============================================ */
 
 // ------- Supabase -------
@@ -412,9 +412,9 @@ function renderDashboard() {
     timerSleep.style.display = 'none';
   }
 
-  // Last feeding (milk / meal / snack)
+  // Last feeding (milk only)
   var timerFeedingEl = document.getElementById('timerFeeding');
-  var feedingRecords = records.filter(function(r) { return r.type === 'milk' || r.type === 'meal' || r.type === 'snack'; });
+  var feedingRecords = records.filter(function(r) { return r.type === 'milk'; });
   feedingRecords.sort(function(a, b) { return b.timestamp - a.timestamp; });
   var lastFeeding = feedingRecords[0];
 
@@ -424,12 +424,12 @@ function renderDashboard() {
     var m = Math.floor((diff % 3600000) / 60000);
     var detail = lastFeeding.type === 'milk' ? lastFeeding.amount + 'ml' : (lastFeeding.subtype || getTypeName(lastFeeding.type));
     timerFeedingEl.innerHTML =
-      '<div class="timer-label">距上次进食</div>' +
+      '<div class="timer-label">距上次喝奶</div>' +
       '<div class="timer-value" id="timerFeedingValue">' + h + '小时' + m + '分钟</div>' +
       '<div class="timer-detail">' + detail + ' · ' + formatTime(lastFeeding.timestamp) + '</div>';
   } else {
     timerFeedingEl.innerHTML =
-      '<div class="timer-label">距上次进食</div>' +
+      '<div class="timer-label">距上次喝奶</div>' +
       '<div class="timer-value">--</div>' +
       '<div class="timer-detail">暂无记录</div>';
   }
@@ -1168,10 +1168,7 @@ function renderTimeline() {
 
         var tlNoteHtml = '';
         if (r.note) {
-          tlNoteHtml =
-            '<div class="tl-note-toggle" onclick="event.stopPropagation();toggleNote(this);">' +
-            '<span class="note-arrow">▶</span> 备注</div>' +
-            '<div class="tl-note-content" style="display:none">' + escapeHtml(r.note) + '</div>';
+          tlNoteHtml = '<div class="tl-note-text" style="color:var(--text-light);font-size:12px;margin-top:2px;">' + escapeHtml(r.note) + '</div>';
         }
 
         html += '<div class="tl-item">' +
@@ -1447,19 +1444,28 @@ function renderStats() {
   }
   html += '</div>';
 
-  // H/W line chart with BMI (moved to end)
-  html += '<div class="chart-container"><div class="chart-title">身高体重变化</div>';
-  html += bmiText;
-  if (hwChartData.length >= 2) {
-    html += '<canvas id="hwChart" width="320" height="180" style="width:100%;max-width:420px"></canvas>';
-  } else if (hwChartData.length === 1) {
-    var r = hwChartData[0];
-    html += '<div style="text-align:center;padding:16px;font-size:15px;">' +
-      (r.height ? '身高: ' + r.height + 'cm  ' : '') +
-      (r.weight ? '体重: ' + r.weight + '斤' : '') +
-      '<br><span style="font-size:12px;color:var(--text-light)">至少需要2条记录才能绘制趋势图</span></div>';
+  // Height chart
+  html += '<div class="chart-container"><div class="chart-title">身高变化</div>';
+  var heightData = hwChartData.filter(function(d) { return d.height !== undefined; });
+  if (heightData.length >= 2) {
+    html += '<canvas id="heightChart" width="320" height="180" style="width:100%;max-width:420px"></canvas>';
+  } else if (heightData.length === 1) {
+    html += '<div style="text-align:center;padding:16px;font-size:15px;">身高: ' + heightData[0].height + 'cm<br><span style="font-size:12px;color:var(--text-light)">至少需要2条记录才能绘制趋势图</span></div>';
   } else {
-    html += '<div class="stat-empty">暂无身高体重数据</div>';
+    html += '<div class="stat-empty">暂无身高数据</div>';
+  }
+  html += '</div>';
+
+  // Weight chart
+  html += '<div class="chart-container"><div class="chart-title">体重变化</div>';
+  html += bmiText;
+  var weightData = hwChartData.filter(function(d) { return d.weight !== undefined; });
+  if (weightData.length >= 2) {
+    html += '<canvas id="weightChart" width="320" height="180" style="width:100%;max-width:420px"></canvas>';
+  } else if (weightData.length === 1) {
+    html += '<div style="text-align:center;padding:16px;font-size:15px;">体重: ' + weightData[0].weight + '斤<br><span style="font-size:12px;color:var(--text-light)">至少需要2条记录才能绘制趋势图</span></div>';
+  } else {
+    html += '<div class="stat-empty">暂无体重数据</div>';
   }
   html += '</div>';
 
@@ -1467,7 +1473,8 @@ function renderStats() {
 
   if (hasMilk) drawMilkChart(days, milkValues, maxMilk);
   if (window._diaperChartData) drawDiaperChart(window._diaperChartData);
-  if (hwChartData.length >= 2) drawHWChartV2(hwChartData);
+  if (heightData.length >= 2) drawSingleMetricChart('heightChart', heightData, 'height', '#FF6B8A', '身高(cm)');
+  if (weightData.length >= 2) drawSingleMetricChart('weightChart', weightData, 'weight', '#5BA4CF', '体重(斤)');
 }
 
 function drawMilkChart(days, values, max) {
@@ -1684,7 +1691,7 @@ function drawDiaperChart(chartData) {
     ctx.fillStyle = '#888';
     ctx.font = '10px sans-serif';
     ctx.textAlign = 'center';
-    var dateLabel = (parseInt(d.slice(8, 10), 10)) + '日';
+    var dateLabel = (i + 1) + '日';
     ctx.fillText(dateLabel, x + barW / 2, pad.top + ch + 18);
 
     window._diaperBarPositions.push({ date: d, x: x, w: barW });
@@ -1750,6 +1757,73 @@ function closeDiaperDetail(e) {
   if (e && e.target !== document.getElementById('diaperDetailPopup')) return;
   var el = document.getElementById('diaperDetailPopup');
   if (el) el.remove();
+}
+
+function drawSingleMetricChart(canvasId, data, metricKey, color, label) {
+  var canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  var ctx = canvas.getContext('2d');
+  var dpr = window.devicePixelRatio || 1;
+  var rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = 180 * dpr;
+  ctx.scale(dpr, dpr);
+  canvas.style.height = '180px';
+
+  var w = rect.width;
+  var h = 180;
+  var pad = { top: 16, right: 12, bottom: 32, left: 44 };
+
+  data = data.slice(-12);
+
+  var vals = data.filter(function(d) { return d[metricKey] !== undefined; }).map(function(d) { return d[metricKey]; });
+  if (vals.length < 2) return;
+  var minVal = Math.floor(Math.min.apply(null, vals) * 0.9);
+  var maxVal = Math.ceil(Math.max.apply(null, vals) * 1.1);
+  if (maxVal === minVal) { maxVal = minVal + 10; minVal = Math.max(0, minVal - 10); }
+
+  var cw = w - pad.left - pad.right;
+  var ch = h - pad.top - pad.bottom;
+
+  ctx.clearRect(0, 0, w, h);
+
+  ctx.strokeStyle = '#F0E8E8';
+  ctx.lineWidth = 1;
+  var gridLines = 4;
+  for (var i = 0; i <= gridLines; i++) {
+    var y = pad.top + (ch / gridLines) * i;
+    ctx.beginPath();
+    ctx.moveTo(pad.left, y);
+    ctx.lineTo(w - pad.right, y);
+    ctx.stroke();
+    ctx.fillStyle = '#888';
+    ctx.font = '10px sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText(((maxVal - (maxVal - minVal) / gridLines * i)).toFixed(1), pad.left - 6, y + 3);
+  }
+
+  var xGap = cw / Math.max(data.length - 1, 1);
+  for (var j = 0; j < data.length; j++) {
+    var r = data[j];
+    var x = pad.left + j * xGap;
+    ctx.fillStyle = '#888';
+    ctx.font = '9px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(formatDate(r.timestamp).slice(5), x, pad.top + ch + 16);
+  }
+
+  var points = [];
+  for (var k = 0; k < data.length; k++) {
+    if (data[k][metricKey] !== undefined) {
+      points.push({ x: pad.left + k * xGap, y: pad.top + ch - (data[k][metricKey] - minVal) / (maxVal - minVal) * ch, val: data[k][metricKey] });
+    }
+  }
+  drawLine(ctx, points, color, label);
+
+  ctx.font = '11px sans-serif';
+  var legendY = pad.top + 4;
+  ctx.fillStyle = color;
+  ctx.fillText('● ' + label, pad.left, legendY);
 }
 
 function drawHWChartV2(data) {
