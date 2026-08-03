@@ -1,5 +1,5 @@
 /* ============================================
-   宝宝喂养记录 PWA - 应用逻辑 v3.23 (Supabase)
+   宝宝喂养记录 PWA - 应用逻辑 v3.24 (Supabase)
    ============================================ */
 
 // ------- Supabase -------
@@ -618,9 +618,15 @@ function renderEntry() {
 }
 
 function datetimeRowHtml() {
+  var now = new Date();
+  var dateVal = now.getFullYear() + '-' +
+    (now.getMonth()+1).toString().padStart(2,'0') + '-' +
+    now.getDate().toString().padStart(2,'0');
+  var timeVal = now.getHours().toString().padStart(2,'0') + ':' +
+    now.getMinutes().toString().padStart(2,'0');
   return '<div class="datetime-row">' +
-    '<span class="dt-label">时间</span>' +
-    '<input type="datetime-local" id="entryDatetime" value="' + toDatetimeLocal(Date.now()) + '">' +
+    '<input type="date" id="entryDate" value="' + dateVal + '" class="dt-date">' +
+    '<input type="time" id="entryTime" value="' + timeVal + '" class="dt-time">' +
     '</div>';
 }
 
@@ -761,9 +767,10 @@ function renderEntryContent() {
 }
 
 function getEntryTimestamp() {
-  var el = document.getElementById('entryDatetime');
-  if (el && el.value) {
-    var ts = new Date(el.value).getTime();
+  var dateEl = document.getElementById('entryDate');
+  var timeEl = document.getElementById('entryTime');
+  if (dateEl && timeEl && dateEl.value && timeEl.value) {
+    var ts = new Date(dateEl.value + 'T' + timeEl.value).getTime();
     if (!isNaN(ts)) return ts;
   }
   return Date.now();

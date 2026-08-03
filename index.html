@@ -188,16 +188,19 @@ body {
 .tl-delete-btn:active { color: #e74c3c; background: #FFF0F0; }
 /* Datetime input */
 .datetime-row {
-  display: flex; align-items: center; gap: 8px; margin-bottom: 8px;
-  padding: 6px 0; border-bottom: 1px dashed var(--border);
+  display: flex; align-items: center; gap: 6px; margin-bottom: 8px;
 }
-.datetime-row .dt-label { font-size: 12px; color: var(--text-light); white-space: nowrap; }
-.datetime-row input[type="datetime-local"] {
-  flex: 1; padding: 8px 10px; border: 2px solid var(--border);
-  border-radius: var(--radius-sm); font-size: 13px; outline: none;
-  background: var(--card); color: var(--text);
+.datetime-row .dt-date {
+  flex: 1; padding: 8px 6px; border: 2px solid var(--border);
+  border-radius: var(--radius-sm); font-size: 12px; outline: none;
+  background: var(--card); color: var(--text); max-width: 120px;
 }
-.datetime-row input[type="datetime-local"]:focus { border-color: var(--pink); }
+.datetime-row .dt-time {
+  flex: 3; padding: 10px 8px; border: 2px solid var(--border);
+  border-radius: var(--radius-sm); font-size: 20px; outline: none;
+  background: var(--card); color: var(--text); text-align: center;
+}
+.datetime-row input:focus { border-color: var(--pink); }
 /* Quick Entry */
 .tab-bar { display:flex; gap:6px; margin-bottom:12px; }
 .tab-bar-row2 { margin-top:-6px; }
