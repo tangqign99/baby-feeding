@@ -1,5 +1,5 @@
 /* ============================================
-   宝宝喂养记录 PWA - 应用逻辑 v3.22 (Supabase)
+   宝宝喂养记录 PWA - 应用逻辑 v3.23 (Supabase)
    ============================================ */
 
 // ------- Supabase -------
@@ -1705,7 +1705,7 @@ function drawDiaperChart(chartData) {
     ctx.fillStyle = '#888';
     ctx.font = '10px sans-serif';
     ctx.textAlign = 'center';
-    var dateLabel = (parseInt(d.slice(5, 7), 10)) + '/' + (parseInt(d.slice(8, 10), 10));
+    var dateLabel = (parseInt(d.slice(8, 10), 10)) + '日';
     ctx.fillText(dateLabel, x + barW / 2, pad.top + ch + 18);
 
     window._diaperBarPositions.push({ date: d, x: x, w: barW });
@@ -1835,10 +1835,10 @@ function drawSingleMetricChart(canvasId, data, metricKey, color, label) {
   }
   drawLine(ctx, points, color, label);
 
-  ctx.font = '11px sans-serif';
-  var legendY = pad.top + 4;
-  ctx.fillStyle = color;
-  ctx.fillText('● ' + label, pad.left, legendY);
+  ctx.font = 'bold 12px sans-serif';
+  ctx.fillStyle = '#4A4A4A';
+  ctx.textAlign = 'center';
+  ctx.fillText(label, pad.left + cw / 2, 14);
 }
 
 function drawHWChartV2(data) {
