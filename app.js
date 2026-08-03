@@ -1,5 +1,5 @@
 /* ============================================
-   宝宝喂养记录 PWA - 应用逻辑 v3.21 (Supabase)
+   宝宝喂养记录 PWA - 应用逻辑 v3.22 (Supabase)
    ============================================ */
 
 // ------- Supabase -------
@@ -1705,7 +1705,7 @@ function drawDiaperChart(chartData) {
     ctx.fillStyle = '#888';
     ctx.font = '10px sans-serif';
     ctx.textAlign = 'center';
-    var dateLabel = (i + 1) + '日';
+    var dateLabel = (parseInt(d.slice(5, 7), 10)) + '/' + (parseInt(d.slice(8, 10), 10));
     ctx.fillText(dateLabel, x + barW / 2, pad.top + ch + 18);
 
     window._diaperBarPositions.push({ date: d, x: x, w: barW });
