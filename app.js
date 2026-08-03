@@ -1,5 +1,5 @@
 /* ============================================
-   宝宝喂养记录 PWA - 应用逻辑 v3.20 (Supabase)
+   宝宝喂养记录 PWA - 应用逻辑 v3.21 (Supabase)
    ============================================ */
 
 // ------- Supabase -------
@@ -65,7 +65,6 @@ async function loadRecords() {
             var { data: inserted, error: migErr } = await supabase.from('feeding_records').insert(cleanUpload).select();
             if (migErr) throw migErr;
             if (inserted) data = (data || []).concat(inserted);
-            toast('已从本地上传 ' + inserted.length + ' 条历史记录', 'success');
           }
         }
       } catch (e) { toast('本地数据迁移失败: ' + e.message, 'warning'); }
@@ -73,12 +72,6 @@ async function loadRecords() {
     }
 
     cachedRecords = normalizeTimestamps(data || []);
-    var count = cachedRecords.length;
-    if (count > 0) {
-      toast('已加载 ' + count + ' 条云端记录', 'success');
-    } else {
-      toast('云端暂无记录，请先录入数据', 'info');
-    }
   } catch (e) {
     toast('数据加载失败: ' + e.message, 'warning');
     cachedRecords = [];
@@ -532,6 +525,23 @@ function showTodayDetail(type) {
 
   if (dayRecords.length === 0) {
     html += '<div style="text-align:center;padding:20px;color:var(--text-light)">今日暂无' + typeName + '记录</div>';
+  } else if (type === 'sleep') {
+    html += '<table style="width:100%;font-size:13px;border-collapse:collapse">';
+    html += '<thead><tr style="border-bottom:2px solid #F0E8E8;text-align:left;color:var(--text-light);font-size:11px"><th style="padding:8px 4px">入睡</th><th style="padding:8px 4px">醒来</th><th style="padding:8px 4px">时长</th><th style="padding:8px 4px">备注</th></tr></thead><tbody>';
+    dayRecords.forEach(function(r) {
+      var startTs = r.sleep_start || r.timestamp;
+      var endTs = r.sleep_end;
+      var dur = (endTs && startTs && endTs > startTs) ? (endTs - startTs) : 0;
+      var sh = Math.floor(dur / 3600000);
+      var sm = Math.floor((dur % 3600000) / 60000);
+      html += '<tr style="border-bottom:1px solid var(--border)">' +
+        '<td style="padding:8px 4px;white-space:nowrap">' + formatTime(startTs) + '</td>' +
+        '<td style="padding:8px 4px;white-space:nowrap">' + (endTs ? formatTime(endTs) : '--') + '</td>' +
+        '<td style="padding:8px 4px;font-weight:600;color:var(--pink);white-space:nowrap">' + (dur > 0 ? sh + 'h' + sm + 'm' : '--') + '</td>' +
+        '<td style="padding:8px 4px;color:var(--text-light);font-size:12px">' + (r.note || '') + '</td>' +
+        '</tr>';
+    });
+    html += '</tbody></table>';
   } else {
     html += '<table style="width:100%;font-size:13px;border-collapse:collapse">';
     html += '<thead><tr style="border-bottom:2px solid #F0E8E8;text-align:left;color:var(--text-light);font-size:11px"><th style="padding:8px 4px">时间</th><th style="padding:8px 4px">详情</th><th style="padding:8px 4px">备注</th></tr></thead><tbody>';
@@ -1444,18 +1454,6 @@ function renderStats() {
   }
   html += '</div>';
 
-  // Height chart
-  html += '<div class="chart-container"><div class="chart-title">身高变化</div>';
-  var heightData = hwChartData.filter(function(d) { return d.height !== undefined; });
-  if (heightData.length >= 2) {
-    html += '<canvas id="heightChart" width="320" height="180" style="width:100%;max-width:420px"></canvas>';
-  } else if (heightData.length === 1) {
-    html += '<div style="text-align:center;padding:16px;font-size:15px;">身高: ' + heightData[0].height + 'cm<br><span style="font-size:12px;color:var(--text-light)">至少需要2条记录才能绘制趋势图</span></div>';
-  } else {
-    html += '<div class="stat-empty">暂无身高数据</div>';
-  }
-  html += '</div>';
-
   // Weight chart
   html += '<div class="chart-container"><div class="chart-title">体重变化</div>';
   html += bmiText;
@@ -1466,6 +1464,18 @@ function renderStats() {
     html += '<div style="text-align:center;padding:16px;font-size:15px;">体重: ' + weightData[0].weight + '斤<br><span style="font-size:12px;color:var(--text-light)">至少需要2条记录才能绘制趋势图</span></div>';
   } else {
     html += '<div class="stat-empty">暂无体重数据</div>';
+  }
+  html += '</div>';
+
+  // Height chart
+  html += '<div class="chart-container"><div class="chart-title">身高变化</div>';
+  var heightData = hwChartData.filter(function(d) { return d.height !== undefined; });
+  if (heightData.length >= 2) {
+    html += '<canvas id="heightChart" width="320" height="180" style="width:100%;max-width:420px"></canvas>';
+  } else if (heightData.length === 1) {
+    html += '<div style="text-align:center;padding:16px;font-size:15px;">身高: ' + heightData[0].height + 'cm<br><span style="font-size:12px;color:var(--text-light)">至少需要2条记录才能绘制趋势图</span></div>';
+  } else {
+    html += '<div class="stat-empty">暂无身高数据</div>';
   }
   html += '</div>';
 
@@ -1674,12 +1684,16 @@ function drawDiaperChart(chartData) {
     var y = pad.top + ch - barH;
 
     var gradient = ctx.createLinearGradient(x, y, x, pad.top + ch);
-    gradient.addColorStop(0, '#C7CEEA');
-    gradient.addColorStop(1, '#B5EAD7');
+    gradient.addColorStop(0, '#FF9AA2');
+    gradient.addColorStop(1, '#FFB7B2');
     ctx.fillStyle = gradient;
     ctx.beginPath();
     ctx.roundRect(x, y, barW, barH, [4, 4, 0, 0]);
     ctx.fill();
+
+    // Cursor hint - make bars clickable
+    ctx.fillStyle = 'rgba(0,0,0,0)';
+    ctx.fillRect(x - 4, pad.top, barW + 8, ch);
 
     if (val > 0) {
       ctx.fillStyle = '#4A4A4A';
@@ -1701,6 +1715,7 @@ function drawDiaperChart(chartData) {
   canvas.onclick = function(e) {
     var cr = canvas.getBoundingClientRect();
     var clickX = e.clientX - cr.left;
+    var clickY = e.clientY - cr.top;
     var bars = window._diaperBarPositions;
     if (!bars) return;
     for (var j = 0; j < bars.length; j++) {
@@ -1772,7 +1787,7 @@ function drawSingleMetricChart(canvasId, data, metricKey, color, label) {
 
   var w = rect.width;
   var h = 180;
-  var pad = { top: 16, right: 12, bottom: 32, left: 44 };
+  var pad = { top: 16, right: 12, bottom: 32, left: 52 };
 
   data = data.slice(-12);
 
