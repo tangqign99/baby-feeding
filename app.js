@@ -1,5 +1,5 @@
 /* ============================================
-   宝宝喂养记录 PWA - 应用逻辑 v3.25 (Supabase)
+   宝宝喂养记录 PWA - 应用逻辑 v3.26 (Supabase)
    ============================================ */
 
 // ------- Supabase -------
@@ -628,8 +628,7 @@ function datetimeRowHtml() {
     '<input type="date" id="entryDate" value="' + dateVal + '" class="dt-date">' +
     '</div>' +
     '<div class="time-picker">' +
-    '<div class="time-display" id="timeDisplay" onclick="document.getElementById(\'entryTime\').showPicker()">' + timeVal + '</div>' +
-    '<input type="time" id="entryTime" value="' + timeVal + '" onchange="updateTimeDisplay()" style="position:absolute;opacity:0;pointer-events:none">' +
+    '<input type="time" id="entryTime" value="' + timeVal + '" class="dt-time">' +
     '<div class="time-quick">' +
     '<button type="button" class="tq-btn" onclick="setQuickTime(0)">现在</button>' +
     '<button type="button" class="tq-btn" onclick="setQuickTime(5)">5分钟前</button>' +
@@ -642,17 +641,8 @@ function setQuickTime(minutesAgo) {
   var d = new Date(Date.now() - minutesAgo * 60000);
   var h = d.getHours().toString().padStart(2,'0');
   var m = d.getMinutes().toString().padStart(2,'0');
-  var val = h + ':' + m;
   var timeEl = document.getElementById('entryTime');
-  var displayEl = document.getElementById('timeDisplay');
-  if (timeEl) timeEl.value = val;
-  if (displayEl) displayEl.textContent = val;
-}
-
-function updateTimeDisplay() {
-  var timeEl = document.getElementById('entryTime');
-  var displayEl = document.getElementById('timeDisplay');
-  if (timeEl && displayEl) displayEl.textContent = timeEl.value;
+  if (timeEl) timeEl.value = h + ':' + m;
 }
 
 function renderEntryContent() {
