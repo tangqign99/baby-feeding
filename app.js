@@ -1,5 +1,5 @@
 /* ============================================
-   宝宝喂养记录 PWA - 应用逻辑 v3.24 (Supabase)
+   宝宝喂养记录 PWA - 应用逻辑 v3.25 (Supabase)
    ============================================ */
 
 // ------- Supabase -------
@@ -626,8 +626,33 @@ function datetimeRowHtml() {
     now.getMinutes().toString().padStart(2,'0');
   return '<div class="datetime-row">' +
     '<input type="date" id="entryDate" value="' + dateVal + '" class="dt-date">' +
-    '<input type="time" id="entryTime" value="' + timeVal + '" class="dt-time">' +
-    '</div>';
+    '</div>' +
+    '<div class="time-picker">' +
+    '<div class="time-display" id="timeDisplay" onclick="document.getElementById(\'entryTime\').showPicker()">' + timeVal + '</div>' +
+    '<input type="time" id="entryTime" value="' + timeVal + '" onchange="updateTimeDisplay()" style="position:absolute;opacity:0;pointer-events:none">' +
+    '<div class="time-quick">' +
+    '<button type="button" class="tq-btn" onclick="setQuickTime(0)">现在</button>' +
+    '<button type="button" class="tq-btn" onclick="setQuickTime(5)">5分钟前</button>' +
+    '<button type="button" class="tq-btn" onclick="setQuickTime(10)">10分钟前</button>' +
+    '<button type="button" class="tq-btn" onclick="setQuickTime(30)">30分钟前</button>' +
+    '</div></div>';
+}
+
+function setQuickTime(minutesAgo) {
+  var d = new Date(Date.now() - minutesAgo * 60000);
+  var h = d.getHours().toString().padStart(2,'0');
+  var m = d.getMinutes().toString().padStart(2,'0');
+  var val = h + ':' + m;
+  var timeEl = document.getElementById('entryTime');
+  var displayEl = document.getElementById('timeDisplay');
+  if (timeEl) timeEl.value = val;
+  if (displayEl) displayEl.textContent = val;
+}
+
+function updateTimeDisplay() {
+  var timeEl = document.getElementById('entryTime');
+  var displayEl = document.getElementById('timeDisplay');
+  if (timeEl && displayEl) displayEl.textContent = timeEl.value;
 }
 
 function renderEntryContent() {
@@ -1215,13 +1240,13 @@ function getDateRange(mode, customStart, customEnd) {
   var startTs;
   switch (mode) {
     case '2days':
-      startTs = endTs - 2 * 86400000;
+      startTs = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1).getTime();
       break;
     case '7days':
-      startTs = endTs - 7 * 86400000;
+      startTs = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6).getTime();
       break;
     case '30days':
-      startTs = endTs - 30 * 86400000;
+      startTs = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29).getTime();
       break;
     case 'month':
       var monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -2194,7 +2219,7 @@ function updateTimer() {
   // Update feeding timer
   var timerFeedingVal = document.getElementById('timerFeedingValue');
   if (timerFeedingVal) {
-    var feedingRecords = records.filter(function(r) { return r.type === 'milk' || r.type === 'meal' || r.type === 'snack'; });
+    var feedingRecords = records.filter(function(r) { return r.type === 'milk'; });
     feedingRecords.sort(function(a, b) { return b.timestamp - a.timestamp; });
     var last = feedingRecords[0];
     if (last) {

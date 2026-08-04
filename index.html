@@ -187,20 +187,30 @@ body {
 }
 .tl-delete-btn:active { color: #e74c3c; background: #FFF0F0; }
 /* Datetime input */
-.datetime-row {
-  display: flex; align-items: center; gap: 6px; margin-bottom: 8px;
-}
+.datetime-row { margin-bottom: 4px; }
 .datetime-row .dt-date {
-  flex: 1; padding: 8px 6px; border: 2px solid var(--border);
-  border-radius: var(--radius-sm); font-size: 12px; outline: none;
-  background: var(--card); color: var(--text); max-width: 120px;
-}
-.datetime-row .dt-time {
-  flex: 3; padding: 10px 8px; border: 2px solid var(--border);
-  border-radius: var(--radius-sm); font-size: 20px; outline: none;
-  background: var(--card); color: var(--text); text-align: center;
+  width: 100%; padding: 8px 10px; border: 2px solid var(--border);
+  border-radius: var(--radius-sm); font-size: 13px; outline: none;
+  background: var(--card); color: var(--text); box-sizing: border-box;
 }
 .datetime-row input:focus { border-color: var(--pink); }
+.time-picker { text-align: center; margin-bottom: 8px; }
+.time-display {
+  font-size: 36px; font-weight: 700; color: var(--text);
+  padding: 12px 0; cursor: pointer; user-select: none;
+  letter-spacing: 2px;
+}
+.time-display:active { opacity: 0.6; }
+.time-quick {
+  display: flex; gap: 6px; justify-content: center; margin-top: 8px;
+}
+.tq-btn {
+  flex: 1; padding: 10px 0; border: 2px solid var(--border);
+  border-radius: var(--radius-sm); font-size: 13px; outline: none;
+  background: var(--card); color: var(--text); cursor: pointer;
+  transition: all 0.15s;
+}
+.tq-btn:active { background: var(--pink); color: #fff; border-color: var(--pink); }
 /* Quick Entry */
 .tab-bar { display:flex; gap:6px; margin-bottom:12px; }
 .tab-bar-row2 { margin-top:-6px; }
@@ -506,7 +516,7 @@ body {
 
 <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-  <script src="./app.js?v=3.24"></script>
+  <script src="./app.js?v=3.25"></script>
   <script>
     // Service Worker 注册
     if ('serviceWorker' in navigator) {
