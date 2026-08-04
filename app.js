@@ -1,5 +1,5 @@
 /* ============================================
-   宝宝喂养记录 PWA - 应用逻辑 v3.29 (Supabase)
+   宝宝喂养记录 PWA - 应用逻辑 v3.30 (Supabase)
    ============================================ */
 
 // ------- Supabase -------
@@ -1449,13 +1449,6 @@ function renderStats() {
       return h + 'h' + m + 'm';
     }
 
-    html += '<div class="sleep-summary-grid">' +
-      '<div>日均 ' + fmtDur(avgSleep) + '</div>' +
-      '<div>总计 ' + fmtDur(totalSleep) + '</div>' +
-      '<div>夜间 ' + fmtDur(totalNight) + '</div>' +
-      '<div>白天 ' + fmtDur(totalDay) + '</div>' +
-      '</div>';
-
     html += '<canvas id="sleepChart" width="360" height="200" style="width:100%;max-width:420px"></canvas>';
     html += '<div style="text-align:center;font-size:11px;color:var(--text-light);margin:4px 0 10px">点击柱子查看当天详情</div>';
 
@@ -1904,12 +1897,19 @@ function drawSleepChart(chartData) {
       ctx.fill();
     }
 
-    // Value label
-    if (totalH > 0) {
-      ctx.fillStyle = '#4A4A4A';
-      ctx.font = 'bold 10px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText(totalH.toFixed(1) + 'h', x + barW / 2, barTop - 4);
+    // Day/night labels on top of bar
+    function fmtHM(ms) { var hh = Math.floor(ms / 3600000); var mm = Math.floor((ms % 3600000) / 60000); return hh + 'h' + mm + 'm'; }
+    ctx.textAlign = 'center';
+    ctx.font = '9px sans-serif';
+    var labelY = barTop - 4;
+    if (dayH > 0) {
+      ctx.fillStyle = '#FF8C00';
+      ctx.fillText('昼 ' + fmtHM(data[d].day), x + barW / 2, labelY);
+      labelY -= 13;
+    }
+    if (nightH > 0) {
+      ctx.fillStyle = '#7B68EE';
+      ctx.fillText('夜 ' + fmtHM(data[d].night), x + barW / 2, labelY);
     }
 
     // Date label (M/D)
