@@ -1,5 +1,5 @@
 /* ============================================
-   宝宝喂养记录 PWA - 应用逻辑 v3.28 (Supabase)
+   宝宝喂养记录 PWA - 应用逻辑 v3.29 (Supabase)
    ============================================ */
 
 // ------- Supabase -------
@@ -1412,19 +1412,13 @@ function renderStats() {
 
   // Sleep records section
   var allSleepRecords = records.filter(function(r) { return r.type === 'sleep'; }).sort(function(a, b) { return b.timestamp - a.timestamp; });
-  var sleepRange = getDateRange(sleepFilterMode, sleepFilterStart, sleepFilterEnd);
-  var sleepRecords = allSleepRecords.filter(function(r) {
-    var ts = r.sleep_start || r.timestamp;
-    return ts >= sleepRange.start && ts <= sleepRange.end;
-  });
   html += '<div class="chart-container"><div class="chart-title">睡眠记录</div>';
-  html += buildFilterHTML('sleep', sleepFilterMode, sleepFilterStart, sleepFilterEnd);
 
-  // Sleep summary metrics & bar chart
+  // Sleep summary metrics & bar chart (all records, no date filter)
   window._sleepChartData = null;
-  if (sleepRecords.length > 0) {
+  if (allSleepRecords.length > 0) {
     var sleepByDay = {};
-    sleepRecords.forEach(function(r) {
+    allSleepRecords.forEach(function(r) {
       var startTs = r.sleep_start || r.timestamp;
       var endTs = r.sleep_end;
       var d = formatDate(startTs);
@@ -1466,33 +1460,6 @@ function renderStats() {
     html += '<div style="text-align:center;font-size:11px;color:var(--text-light);margin:4px 0 10px">点击柱子查看当天详情</div>';
 
     window._sleepChartData = { dates: sleepDates, data: sleepByDay };
-  }
-
-  if (sleepRecords.length > 0) {
-    html += '<div style="overflow-x:auto"><table style="width:100%;font-size:12px;border-collapse:collapse;min-width:360px">';
-    html += '<thead><tr style="border-bottom:2px solid #F0E8E8;text-align:left;color:var(--text-light);font-size:11px"><th style="padding:8px 4px">日期</th><th style="padding:8px 4px">入睡</th><th style="padding:8px 4px">醒来</th><th style="padding:8px 4px">时长</th><th style="padding:8px 4px">类型</th></tr></thead><tbody>';
-    sleepRecords.forEach(function(r) {
-      var startTs = r.sleep_start || r.timestamp;
-      var endTs = r.sleep_end;
-      var dur = (endTs && startTs && endTs > startTs) ? (endTs - startTs) : 0;
-      var sh = Math.floor(dur / 3600000);
-      var sm = Math.floor((dur % 3600000) / 60000);
-
-      var startDate = new Date(startTs);
-      var startHour = startDate.getHours();
-      var isNight = (startHour >= 20 || startHour < 6);
-      var typeTag = isNight ? '夜间' : '白天';
-      var tagColor = isNight ? '#7B68EE' : '#FF8C00';
-
-      html += '<tr style="border-bottom:1px solid var(--border)">' +
-        '<td style="padding:8px 4px;white-space:nowrap">' + formatDate(startTs) + '</td>' +
-        '<td style="padding:8px 4px;white-space:nowrap">' + formatTime(startTs) + '</td>' +
-        '<td style="padding:8px 4px;white-space:nowrap">' + (endTs ? formatTime(endTs) : '--') + '</td>' +
-        '<td style="padding:8px 4px;white-space:nowrap;font-weight:500">' + (dur > 0 ? sh + 'h' + sm + 'm' : '--') + '</td>' +
-        '<td style="padding:8px 4px"><span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600;background:' + tagColor + '18;color:' + tagColor + '">' + typeTag + '</span></td>' +
-        '</tr>';
-    });
-    html += '</tbody></table></div>';
   } else {
     html += '<div class="record-empty">暂无睡眠数据</div>';
   }
@@ -1500,16 +1467,11 @@ function renderStats() {
 
   // Diaper stats
   var allDiaperRecords = records.filter(function(r) { return r.type === 'diaper'; }).sort(function(a, b) { return b.timestamp - a.timestamp; });
-  var diaperRange = getDateRange(diaperFilterMode, diaperFilterStart, diaperFilterEnd);
-  var diaperRecords = allDiaperRecords.filter(function(r) {
-    return r.timestamp >= diaperRange.start && r.timestamp <= diaperRange.end;
-  });
   html += '<div class="chart-container"><div class="chart-title">尿布统计</div>';
-  html += buildFilterHTML('diaper', diaperFilterMode, diaperFilterStart, diaperFilterEnd);
-  if (diaperRecords.length > 0) {
+  if (allDiaperRecords.length > 0) {
     // Group by date
     var diaperByDate = {};
-    diaperRecords.forEach(function(r) {
+    allDiaperRecords.forEach(function(r) {
       var d = formatDate(r.timestamp);
       if (!diaperByDate[d]) diaperByDate[d] = { pee: 0, poop: 0, total: 0, records: [] };
       var dt = r.diaper_type || '';
@@ -1518,24 +1480,11 @@ function renderStats() {
       diaperByDate[d].total += 1;
       diaperByDate[d].records.push(r);
     });
-    var diaperDates = Object.keys(diaperByDate).sort(function(a, b) { return b.localeCompare(a); });
+    var diaperDates = Object.keys(diaperByDate).sort(function(a, b) { return a.localeCompare(b); });
 
     // Bar chart
     html += '<canvas id="diaperChart" width="320" height="180" style="width:100%;max-width:420px"></canvas>';
     html += '<div style="text-align:center;font-size:11px;color:var(--text-light);margin:4px 0 10px">点击柱子查看当天详情</div>';
-
-    html += '<div style="overflow-x:auto"><table style="width:100%;font-size:12px;border-collapse:collapse;min-width:300px">';
-    html += '<thead><tr style="border-bottom:2px solid #F0E8E8;text-align:left;color:var(--text-light);font-size:11px"><th style="padding:8px 4px">日期</th><th style="padding:8px 4px">小便</th><th style="padding:8px 4px">大便</th><th style="padding:8px 4px">总计</th></tr></thead><tbody>';
-    diaperDates.forEach(function(d) {
-      var row = diaperByDate[d];
-      html += '<tr style="border-bottom:1px solid var(--border)">' +
-        '<td style="padding:8px 4px;white-space:nowrap">' + d + '</td>' +
-        '<td style="padding:8px 4px">' + row.pee + '</td>' +
-        '<td style="padding:8px 4px">' + row.poop + '</td>' +
-        '<td style="padding:8px 4px;font-weight:600">' + row.total + '</td>' +
-        '</tr>';
-    });
-    html += '</tbody></table></div>';
 
     // Store for chart drawing
     window._diaperChartData = { dates: diaperDates, data: diaperByDate };
