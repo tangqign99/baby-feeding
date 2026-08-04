@@ -1,5 +1,5 @@
 /* ============================================
-   宝宝喂养记录 PWA - 应用逻辑 v3.27 (Supabase)
+   宝宝喂养记录 PWA - 应用逻辑 v3.28 (Supabase)
    ============================================ */
 
 // ------- Supabase -------
@@ -1419,6 +1419,55 @@ function renderStats() {
   });
   html += '<div class="chart-container"><div class="chart-title">睡眠记录</div>';
   html += buildFilterHTML('sleep', sleepFilterMode, sleepFilterStart, sleepFilterEnd);
+
+  // Sleep summary metrics & bar chart
+  window._sleepChartData = null;
+  if (sleepRecords.length > 0) {
+    var sleepByDay = {};
+    sleepRecords.forEach(function(r) {
+      var startTs = r.sleep_start || r.timestamp;
+      var endTs = r.sleep_end;
+      var d = formatDate(startTs);
+      if (!sleepByDay[d]) sleepByDay[d] = { night: 0, day: 0, records: [] };
+      var dur = (endTs && startTs && endTs > startTs) ? (endTs - startTs) : 0;
+      var startHour = new Date(startTs).getHours();
+      if (startHour >= 20 || startHour < 6) {
+        sleepByDay[d].night += dur;
+      } else {
+        sleepByDay[d].day += dur;
+      }
+      sleepByDay[d].records.push(r);
+    });
+
+    var sleepDates = Object.keys(sleepByDay).sort();
+    var totalNight = 0, totalDay = 0;
+    sleepDates.forEach(function(d) {
+      totalNight += sleepByDay[d].night;
+      totalDay += sleepByDay[d].day;
+    });
+    var totalSleep = totalNight + totalDay;
+    var dayCount = sleepDates.length;
+    var avgSleep = dayCount > 0 ? totalSleep / dayCount : 0;
+
+    function fmtDur(ms) {
+      var h = Math.floor(ms / 3600000);
+      var m = Math.floor((ms % 3600000) / 60000);
+      return h + 'h' + m + 'm';
+    }
+
+    html += '<div class="sleep-summary-grid">' +
+      '<div>日均 ' + fmtDur(avgSleep) + '</div>' +
+      '<div>总计 ' + fmtDur(totalSleep) + '</div>' +
+      '<div>夜间 ' + fmtDur(totalNight) + '</div>' +
+      '<div>白天 ' + fmtDur(totalDay) + '</div>' +
+      '</div>';
+
+    html += '<canvas id="sleepChart" width="360" height="200" style="width:100%;max-width:420px"></canvas>';
+    html += '<div style="text-align:center;font-size:11px;color:var(--text-light);margin:4px 0 10px">点击柱子查看当天详情</div>';
+
+    window._sleepChartData = { dates: sleepDates, data: sleepByDay };
+  }
+
   if (sleepRecords.length > 0) {
     html += '<div style="overflow-x:auto"><table style="width:100%;font-size:12px;border-collapse:collapse;min-width:360px">';
     html += '<thead><tr style="border-bottom:2px solid #F0E8E8;text-align:left;color:var(--text-light);font-size:11px"><th style="padding:8px 4px">日期</th><th style="padding:8px 4px">入睡</th><th style="padding:8px 4px">醒来</th><th style="padding:8px 4px">时长</th><th style="padding:8px 4px">类型</th></tr></thead><tbody>';
@@ -1525,6 +1574,7 @@ function renderStats() {
 
   if (hasMilk) drawMilkChart(days, milkValues, maxMilk);
   if (window._diaperChartData) drawDiaperChart(window._diaperChartData);
+  if (window._sleepChartData) drawSleepChart(window._sleepChartData);
   if (heightData.length >= 2) drawSingleMetricChart('heightChart', heightData, 'height', '#FF6B8A', '身高(cm)');
   if (weightData.length >= 2) drawSingleMetricChart('weightChart', weightData, 'weight', '#5BA4CF', '体重(斤)');
 }
@@ -1813,6 +1863,211 @@ function showDayDiaperDetail(dateStr) {
 function closeDiaperDetail(e) {
   if (e && e.target !== document.getElementById('diaperDetailPopup')) return;
   var el = document.getElementById('diaperDetailPopup');
+  if (el) el.remove();
+}
+
+function drawSleepChart(chartData) {
+  var canvas = document.getElementById('sleepChart');
+  if (!canvas) return;
+  var ctx = canvas.getContext('2d');
+  var dpr = window.devicePixelRatio || 1;
+  var rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = 200 * dpr;
+  ctx.scale(dpr, dpr);
+  canvas.style.height = '200px';
+
+  var w = rect.width;
+  var h = 200;
+  var pad = { top: 16, right: 12, bottom: 32, left: 44 };
+  var cw = w - pad.left - pad.right;
+  var ch = h - pad.top - pad.bottom;
+
+  var dates = chartData.dates;
+  var data = chartData.data;
+  var barW = Math.max(14, Math.min(32, cw / dates.length * 0.6));
+  var gap = (cw - barW * dates.length) / (dates.length + 1);
+
+  // Compute max total hours per day for scale (round up to nearest 0.5h)
+  var maxTotalH = 0;
+  dates.forEach(function(d) {
+    var t = (data[d].night + data[d].day) / 3600000;
+    if (t > maxTotalH) maxTotalH = t;
+  });
+  if (maxTotalH === 0) maxTotalH = 12;
+  maxTotalH = Math.ceil(maxTotalH * 2) / 2;
+
+  ctx.clearRect(0, 0, w, h);
+
+  // Grid lines (Y axis: hours, step 1h or 2h)
+  var gridStep = maxTotalH <= 12 ? 2 : 4;
+  var gridLines = Math.floor(maxTotalH / gridStep);
+  ctx.strokeStyle = '#F0E8E8';
+  ctx.lineWidth = 1;
+  for (var i = 0; i <= gridLines; i++) {
+    var val = gridStep * i;
+    var y = pad.top + ch - (val / maxTotalH) * ch;
+    ctx.beginPath();
+    ctx.moveTo(pad.left, y);
+    ctx.lineTo(w - pad.right, y);
+    ctx.stroke();
+    ctx.fillStyle = '#888';
+    ctx.font = '11px sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText(val + 'h', pad.left - 6, y + 4);
+  }
+
+  // Store bar positions for click
+  window._sleepBarPositions = [];
+
+  dates.forEach(function(d, i) {
+    var nightH = data[d].night / 3600000;
+    var dayH = data[d].day / 3600000;
+    var totalH = nightH + dayH;
+    var x = pad.left + gap + i * (barW + gap);
+    var barTop = pad.top + ch - (totalH / maxTotalH) * ch;
+    var nightBarH = (nightH / maxTotalH) * ch;
+    var dayBarH = (dayH / maxTotalH) * ch;
+
+    // Night sleep (bottom)
+    if (nightH > 0) {
+      ctx.fillStyle = '#7B68EE';
+      var ny = pad.top + ch - nightBarH;
+      ctx.beginPath();
+      if (dayH <= 0) {
+        ctx.roundRect(x, barTop, barW, nightBarH, [4, 4, 4, 4]);
+      } else {
+        ctx.roundRect(x, ny, barW, nightBarH, [0, 0, 0, 0]);
+      }
+      ctx.fill();
+    }
+
+    // Day sleep (top)
+    if (dayH > 0) {
+      ctx.fillStyle = '#FF8C00';
+      var dy = pad.top + ch - nightBarH - dayBarH;
+      ctx.beginPath();
+      if (nightH <= 0) {
+        ctx.roundRect(x, barTop, barW, dayBarH, [4, 4, 4, 4]);
+      } else {
+        ctx.roundRect(x, dy, barW, dayBarH, [4, 4, 0, 0]);
+      }
+      ctx.fill();
+    }
+
+    // Value label
+    if (totalH > 0) {
+      ctx.fillStyle = '#4A4A4A';
+      ctx.font = 'bold 10px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(totalH.toFixed(1) + 'h', x + barW / 2, barTop - 4);
+    }
+
+    // Date label (M/D)
+    ctx.fillStyle = '#888';
+    ctx.font = '10px sans-serif';
+    ctx.textAlign = 'center';
+    var parts = d.split('-');
+    var label = parseInt(parts[1], 10) + '/' + parseInt(parts[2], 10);
+    ctx.fillText(label, x + barW / 2, pad.top + ch + 16);
+
+    window._sleepBarPositions.push({ date: d, x: x, w: barW });
+  });
+
+  // Legend
+  var legX = pad.left;
+  var legY = pad.top + ch + 24;
+  ctx.fillStyle = '#7B68EE';
+  ctx.fillRect(legX, legY, 10, 10);
+  ctx.fillStyle = '#888';
+  ctx.font = '10px sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillText('夜间', legX + 14, legY + 9);
+
+  ctx.fillStyle = '#FF8C00';
+  ctx.fillRect(legX + 50, legY, 10, 10);
+  ctx.fillStyle = '#888';
+  ctx.fillText('白天', legX + 64, legY + 9);
+
+  // Click handler
+  canvas.style.cursor = 'pointer';
+  canvas.onclick = function(e) {
+    var cr = canvas.getBoundingClientRect();
+    var clickX = e.clientX - cr.left;
+    var bars = window._sleepBarPositions;
+    if (!bars) return;
+    for (var j = 0; j < bars.length; j++) {
+      var b = bars[j];
+      if (clickX >= b.x - 6 && clickX <= b.x + b.w + 6) {
+        showDaySleepDetail(b.date);
+        return;
+      }
+    }
+  };
+}
+
+function showDaySleepDetail(dateStr) {
+  var existing = document.getElementById('sleepDetailPopup');
+  if (existing) existing.remove();
+
+  var records = getRecords();
+  var dayRecords = records.filter(function(r) {
+    var ts = r.sleep_start || r.timestamp;
+    return r.type === 'sleep' && formatDate(ts) === dateStr;
+  }).sort(function(a, b) { return (a.sleep_start || a.timestamp) - (b.sleep_start || b.timestamp); });
+
+  var d = new Date(dateStr + 'T00:00:00');
+  var title = (d.getMonth() + 1) + '月' + d.getDate() + '日 睡眠详情';
+
+  var html = '<div class="modal-overlay show" id="sleepDetailPopup" onclick="closeSleepDetail(event)">' +
+    '<div class="modal-box" style="max-height:70vh;overflow-y:auto" onclick="event.stopPropagation()">' +
+    '<h3 style="margin-bottom:12px">' + title + '</h3>';
+
+  if (dayRecords.length === 0) {
+    html += '<div style="text-align:center;padding:20px;color:var(--text-light)">当天无睡眠记录</div>';
+  } else {
+    var totalDay = 0;
+    html += '<table style="width:100%;font-size:13px;border-collapse:collapse">';
+    html += '<thead><tr style="border-bottom:2px solid #F0E8E8;text-align:left;color:var(--text-light);font-size:11px"><th style="padding:8px 4px">时间</th><th style="padding:8px 4px">时长</th><th style="padding:8px 4px">类型</th></tr></thead><tbody>';
+    dayRecords.forEach(function(r) {
+      var startTs = r.sleep_start || r.timestamp;
+      var endTs = r.sleep_end;
+      var dur = (endTs && startTs && endTs > startTs) ? (endTs - startTs) : 0;
+      totalDay += dur;
+      var sh = Math.floor(dur / 3600000);
+      var sm = Math.floor((dur % 3600000) / 60000);
+      var durStr = dur > 0 ? sh + 'h' + sm + 'm' : '--';
+
+      var startHour = new Date(startTs).getHours();
+      var isNight = (startHour >= 20 || startHour < 6);
+      var typeTag = isNight ? '夜间' : '白天';
+      var tagColor = isNight ? '#7B68EE' : '#FF8C00';
+
+      html += '<tr style="border-bottom:1px solid var(--border)">' +
+        '<td style="padding:8px 4px;white-space:nowrap">' + formatTime(startTs) + '~' + (endTs ? formatTime(endTs) : '--') + '</td>' +
+        '<td style="padding:8px 4px;font-weight:600;color:var(--pink)">' + durStr + '</td>' +
+        '<td style="padding:8px 4px"><span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600;background:' + tagColor + '18;color:' + tagColor + '">' + typeTag + '</span></td>' +
+        '</tr>';
+    });
+    var totalH = Math.floor(totalDay / 3600000);
+    var totalM = Math.floor((totalDay % 3600000) / 60000);
+    html += '<tr style="font-weight:700;border-top:2px solid var(--border)">' +
+      '<td style="padding:10px 4px">当日合计</td>' +
+      '<td style="padding:10px 4px;color:var(--pink)" colspan="2">' + totalH + 'h' + totalM + 'm</td>' +
+      '</tr>';
+    html += '</tbody></table>';
+  }
+
+  html += '<div class="btn-row" style="margin-top:16px">' +
+    '<button class="btn-confirm" onclick="document.getElementById(\'sleepDetailPopup\').remove()" style="flex:1;padding:10px;border-radius:20px;font-size:14px;border:none;background:var(--pink);color:#fff;cursor:pointer">关闭</button>' +
+    '</div></div></div>';
+
+  document.body.insertAdjacentHTML('beforeend', html);
+}
+
+function closeSleepDetail(e) {
+  if (e && e.target !== document.getElementById('sleepDetailPopup')) return;
+  var el = document.getElementById('sleepDetailPopup');
   if (el) el.remove();
 }
 
