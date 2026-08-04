@@ -1234,10 +1234,10 @@ function renderTimeline() {
 }
 
 // ------- Stats -------
-var sleepFilterMode = '2days';
+var sleepFilterMode = '3days';
 var sleepFilterStart = '';
 var sleepFilterEnd = '';
-var diaperFilterMode = '2days';
+var diaperFilterMode = '3days';
 var diaperFilterStart = '';
 var diaperFilterEnd = '';
 
@@ -1248,6 +1248,9 @@ function getDateRange(mode, customStart, customEnd) {
   switch (mode) {
     case '2days':
       startTs = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1).getTime();
+      break;
+    case '3days':
+      startTs = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 2).getTime();
       break;
     case '7days':
       startTs = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6).getTime();
@@ -1276,7 +1279,7 @@ function getDateRange(mode, customStart, customEnd) {
 
 function buildFilterHTML(prefix, mode, startVal, endVal) {
   var modes = [
-    { id: '2days', label: '最近2天' },
+    { id: '3days', label: '最近3天' },
     { id: '7days', label: '最近7天' },
     { id: '30days', label: '最近30天' },
     { id: 'month', label: '本月' },
