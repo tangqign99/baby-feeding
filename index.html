@@ -54,7 +54,9 @@ body {
   padding: 16px 14px 12px;
   position:sticky; top:0; background:var(--bg); z-index:10;
 }
+.header-left { display:flex; flex-direction:column; }
 .header h1 { font-size:22px; font-weight:700; color:var(--pink); }
+.baby-age { font-size:13px; color:#999; margin-top:2px; }
 .header .baby-emoji { width:42px; height:42px; border-radius:50%; object-fit:cover; cursor:default; }
 /* Toast */
 .toast-container {
@@ -416,7 +418,10 @@ body {
 <div class="app-container" id="appContainer">
 
   <div class="header">
-    <h1 id="headerTitle">杨一舟的喂养记录</h1>
+    <div class="header-left">
+      <h1 id="headerTitle">杨一舟的喂养记录</h1>
+      <div id="babyAge" class="baby-age"></div>
+    </div>
     <img class="baby-emoji" src="baby_avatar.jpg" alt="宝宝头像">
   </div>
 

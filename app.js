@@ -1,5 +1,5 @@
 /* ============================================
-   宝宝喂养记录 PWA - 应用逻辑 v3.26 (Supabase)
+   宝宝喂养记录 PWA - 应用逻辑 v3.27 (Supabase)
    ============================================ */
 
 // ------- Supabase -------
@@ -8,6 +8,22 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 var supabase;
 var cachedRecords = [];
 var _realtimeSub = null;
+
+// ------- Baby Age -------
+const BIRTH_DATE = '2025-11-11';
+
+function calcBabyAge() {
+  var birth = new Date(BIRTH_DATE + 'T00:00:00');
+  var today = new Date();
+  var totalMonths = (today.getFullYear() - birth.getFullYear()) * 12 + (today.getMonth() - birth.getMonth());
+  var days = today.getDate() - birth.getDate();
+  if (days < 0) {
+    totalMonths -= 1;
+    var prevMonth = new Date(today.getFullYear(), today.getMonth(), 0);
+    days += prevMonth.getDate();
+  }
+  return totalMonths + '个月' + days + '天';
+}
 
 // ------- Storage -------
 const STORAGE_KEY = 'baby_feeding_records'; // legacy localStorage key for migration
@@ -360,6 +376,7 @@ function renderDashboard() {
   var records = getRecords();
   var settings = getSettings();
   document.getElementById('headerTitle').textContent = settings.babyName + '的喂养记录';
+  document.getElementById('babyAge').textContent = calcBabyAge();
   
   // Summary: today
   var today = formatDate(Date.now());
