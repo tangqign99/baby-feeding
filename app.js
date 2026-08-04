@@ -1,5 +1,5 @@
 /* ============================================
-   宝宝喂养记录 PWA - 应用逻辑 v3.30 (Supabase)
+   宝宝喂养记录 PWA - 应用逻辑 v3.31 (Supabase)
    ============================================ */
 
 // ------- Supabase -------
@@ -1897,19 +1897,17 @@ function drawSleepChart(chartData) {
       ctx.fill();
     }
 
-    // Day/night labels on top of bar
+    // Duration labels inside bars
     function fmtHM(ms) { var hh = Math.floor(ms / 3600000); var mm = Math.floor((ms % 3600000) / 60000); return hh + 'h' + mm + 'm'; }
     ctx.textAlign = 'center';
     ctx.font = '9px sans-serif';
-    var labelY = barTop - 4;
     if (dayH > 0) {
-      ctx.fillStyle = '#FF8C00';
-      ctx.fillText('昼 ' + fmtHM(data[d].day), x + barW / 2, labelY);
-      labelY -= 13;
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillText(fmtHM(data[d].day), x + barW / 2, dy + dayBarH / 2 + 3);
     }
     if (nightH > 0) {
-      ctx.fillStyle = '#7B68EE';
-      ctx.fillText('夜 ' + fmtHM(data[d].night), x + barW / 2, labelY);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillText(fmtHM(data[d].night), x + barW / 2, ny + nightBarH / 2 + 3);
     }
 
     // Date label (M/D)
