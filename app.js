@@ -404,20 +404,12 @@ function renderDashboard() {
   });
   var sleepStr = sleepCount > 0 ? Math.floor(totalSleepMin / 60) + 'h' + (totalSleepMin % 60) + 'm' : '--';
 
-  // Formula cost calculation
-  var formulaCost = 0;
-  todayRecords.forEach(function(r) {
-    if (r.type === 'milk') formulaCost += (r.amount || 0) / 30 * FORMULA_COST_PER_30ML;
-  });
-  var formulaCostStr = '¥' + formulaCost.toFixed(2);
-
   document.getElementById('dashSummary').innerHTML =
     '<div class="dash-milk-hero" style="cursor:pointer" onclick="showTodayDetail(\'milk\')"><div class="hero-value">' + totalMilk + '<span class="unit">ml</span></div><div class="label">今日奶量</div></div>' +
-    '<div class="dash-sub-row" style="grid-template-columns:repeat(4,1fr)">' +
+    '<div class="dash-sub-row" style="grid-template-columns:repeat(3,1fr)">' +
     '<div class="dash-item" style="cursor:pointer" onclick="showTodayDetail(\'meal\')"><div class="value">' + mealCount + '<span class="unit">次</span></div><div class="label">吃饭</div></div>' +
     '<div class="dash-item" style="cursor:pointer" onclick="showTodayDetail(\'sleep\')"><div class="value">' + sleepStr + '</div><div class="label">睡眠</div></div>' +
     '<div class="dash-item" style="cursor:pointer" onclick="showTodayDetail(\'diaper\')"><div class="value">' + diaperCount + '<span class="unit">次</span></div><div class="label">尿布</div></div>' +
-    '<div class="dash-item" style="cursor:pointer" onclick="showFormulaDetail()"><div class="value">' + formulaCostStr + '</div><div class="label">奶粉费用</div></div>' +
     '</div>';
 
   // Timer: check for active sleep first
