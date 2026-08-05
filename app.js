@@ -1,6 +1,8 @@
 /* ============================================
-   宝宝喂养记录 PWA - 应用逻辑 v3.31 (Supabase)
+   宝宝喂养记录 PWA - 应用逻辑 v3.32 (Supabase)
    ============================================ */
+
+const FORMULA_COST_PER_30ML = 2.28; // 30ml = 4.2g, 680g = 369元 → 每30ml费用
 
 // ------- Supabase -------
 const SUPABASE_URL = 'https://nzbpopxrxniixnhnqktw.supabase.co';
@@ -372,6 +374,13 @@ function getActiveSleep() {
   return null;
 }
 
+function switchTab(tab) {
+  entryTab = tab;
+  selectedPreset = '';
+  selectedPortion = '';
+  navigateTo('entry');
+}
+
 function renderDashboard() {
   var records = getRecords();
   var settings = getSettings();
@@ -395,12 +404,20 @@ function renderDashboard() {
   });
   var sleepStr = sleepCount > 0 ? Math.floor(totalSleepMin / 60) + 'h' + (totalSleepMin % 60) + 'm' : '--';
 
+  // Formula cost calculation
+  var formulaCost = 0;
+  todayRecords.forEach(function(r) {
+    if (r.type === 'milk') formulaCost += (r.amount || 0) / 30 * FORMULA_COST_PER_30ML;
+  });
+  var formulaCostStr = '¥' + formulaCost.toFixed(2);
+
   document.getElementById('dashSummary').innerHTML =
     '<div class="dash-milk-hero" style="cursor:pointer" onclick="showTodayDetail(\'milk\')"><div class="hero-value">' + totalMilk + '<span class="unit">ml</span></div><div class="label">今日奶量</div></div>' +
-    '<div class="dash-sub-row" style="grid-template-columns:repeat(3,1fr)">' +
+    '<div class="dash-sub-row" style="grid-template-columns:repeat(4,1fr)">' +
     '<div class="dash-item" style="cursor:pointer" onclick="showTodayDetail(\'meal\')"><div class="value">' + mealCount + '<span class="unit">次</span></div><div class="label">吃饭</div></div>' +
     '<div class="dash-item" style="cursor:pointer" onclick="showTodayDetail(\'sleep\')"><div class="value">' + sleepStr + '</div><div class="label">睡眠</div></div>' +
     '<div class="dash-item" style="cursor:pointer" onclick="showTodayDetail(\'diaper\')"><div class="value">' + diaperCount + '<span class="unit">次</span></div><div class="label">尿布</div></div>' +
+    '<div class="dash-item" style="cursor:pointer" onclick="showFormulaDetail()"><div class="value">' + formulaCostStr + '</div><div class="label">奶粉费用</div></div>' +
     '</div>';
 
   // Timer: check for active sleep first
@@ -417,9 +434,13 @@ function renderDashboard() {
       '<div class="timer-value" id="timerValue">' + sh + '小时' + sm + '分钟</div>' +
       '<div class="timer-detail">入睡于 ' + formatTime(activeSleep.sleep_start) + '</div>';
     timerSleep.style.display = '';
+    timerSleep.style.cursor = 'pointer';
+    timerSleep.onclick = function() { endActiveSleep(); };
   } else {
     timerSleep.innerHTML = '';
     timerSleep.style.display = 'none';
+    timerSleep.onclick = null;
+    timerSleep.style.cursor = '';
   }
 
   // Last feeding (milk only)
@@ -437,11 +458,15 @@ function renderDashboard() {
       '<div class="timer-label">距上次喝奶</div>' +
       '<div class="timer-value" id="timerFeedingValue">' + h + '小时' + m + '分钟</div>' +
       '<div class="timer-detail">' + detail + ' · ' + formatTime(lastFeeding.timestamp) + '</div>';
+    timerFeedingEl.style.cursor = 'pointer';
+    timerFeedingEl.onclick = function() { switchTab('milk'); };
   } else {
     timerFeedingEl.innerHTML =
       '<div class="timer-label">距上次喝奶</div>' +
       '<div class="timer-value">--</div>' +
       '<div class="timer-detail">暂无记录</div>';
+    timerFeedingEl.style.cursor = 'pointer';
+    timerFeedingEl.onclick = function() { switchTab('milk'); };
   }
 
   // Recent 5 records — filtered: sleep only yesterday daytime + today
@@ -583,6 +608,125 @@ function showTodayDetail(type) {
 function closeTodayDetail(e) {
   if (e && e.target !== document.getElementById('todayDetailPopup')) return;
   var el = document.getElementById('todayDetailPopup');
+  if (el) el.remove();
+}
+
+// ------- End Active Sleep from Dashboard -------
+function endActiveSleep() {
+  var activeSleep = getActiveSleep();
+  if (!activeSleep) return;
+
+  var existing = document.getElementById('sleepEndPopup');
+  if (existing) existing.remove();
+
+  var sleepDiff = Date.now() - activeSleep.sleep_start;
+  var sh = Math.floor(sleepDiff / 3600000);
+  var sm = Math.floor((sleepDiff % 3600000) / 60000);
+
+  var html = '<div class="modal-overlay show" id="sleepEndPopup" onclick="closeSleepEndPopup(event)">' +
+    '<div class="modal-box" onclick="event.stopPropagation()">' +
+    '<h3 style="margin-bottom:8px">结束睡眠</h3>' +
+    '<div style="text-align:center;padding:16px 0">' +
+    '<div style="font-size:42px;font-weight:700;color:var(--pink);margin-bottom:8px">' + sh + '小时' + sm + '分钟</div>' +
+    '<div style="font-size:13px;color:var(--text-light);margin-bottom:16px">入睡于 ' + formatTime(activeSleep.sleep_start) + '</div>' +
+    '<button class="btn-primary" onclick="confirmSleepEnd()" style="margin-bottom:10px">宝宝醒了</button>' +
+    '<br><button onclick="document.getElementById(\'sleepEndPopup\').remove()" style="border:none;background:none;color:var(--text-light);font-size:13px;padding:8px;cursor:pointer">取消</button>' +
+    '</div></div></div>';
+  document.body.insertAdjacentHTML('beforeend', html);
+}
+
+function closeSleepEndPopup(e) {
+  if (e && e.target !== document.getElementById('sleepEndPopup')) return;
+  var el = document.getElementById('sleepEndPopup');
+  if (el) el.remove();
+}
+
+async function confirmSleepEnd() {
+  var activeSleep = getActiveSleep();
+  if (!activeSleep) return;
+
+  var now = Date.now();
+  var dur = now - activeSleep.sleep_start;
+  var sh = Math.floor(dur / 3600000);
+  var sm = Math.floor((dur % 3600000) / 60000);
+
+  try {
+    var sleepEndIso = new Date(now).toISOString();
+    var { error } = await supabase
+      .from('feeding_records')
+      .update({ sleep_end: sleepEndIso })
+      .eq('id', activeSleep.id);
+    if (error) throw error;
+
+    for (var i = 0; i < cachedRecords.length; i++) {
+      if (cachedRecords[i].id === activeSleep.id) {
+        cachedRecords[i].sleep_end = now;
+        break;
+      }
+    }
+    window._activeSleep = null;
+    toast('宝宝醒了！睡眠 ' + sh + '小时' + sm + '分钟 💤', 'success');
+
+    var el = document.getElementById('sleepEndPopup');
+    if (el) el.remove();
+
+    renderDashboard();
+  } catch (e) {
+    toast('更新失败: ' + e.message, 'warning');
+  }
+}
+
+// ------- Formula Cost Detail -------
+function showFormulaDetail() {
+  var existing = document.getElementById('formulaDetailPopup');
+  if (existing) existing.remove();
+
+  var today = formatDate(Date.now());
+  var records = getRecords();
+  var dayRecords = records.filter(function(r) {
+    return r.type === 'milk' && formatDate(r.timestamp) === today;
+  }).sort(function(a, b) { return a.timestamp - b.timestamp; });
+
+  var totalCost = 0;
+
+  var html = '<div class="modal-overlay show" id="formulaDetailPopup" onclick="closeFormulaDetail(event)">' +
+    '<div class="modal-box" style="max-height:70vh;overflow-y:auto" onclick="event.stopPropagation()">' +
+    '<h3 style="margin-bottom:12px">今日奶粉费用详情</h3>';
+
+  if (dayRecords.length === 0) {
+    html += '<div style="text-align:center;padding:20px;color:var(--text-light)">今天还没有喝奶记录</div>';
+  } else {
+    html += '<table style="width:100%;font-size:13px;border-collapse:collapse">';
+    html += '<thead><tr style="border-bottom:2px solid #F0E8E8;text-align:left;color:var(--text-light);font-size:11px"><th style="padding:8px 4px">时间</th><th style="padding:8px 4px">奶量</th><th style="padding:8px 4px">费用</th></tr></thead><tbody>';
+    dayRecords.forEach(function(r) {
+      var amount = r.amount || 0;
+      var cost = amount / 30 * FORMULA_COST_PER_30ML;
+      totalCost += cost;
+      html += '<tr style="border-bottom:1px solid var(--border)">' +
+        '<td style="padding:8px 4px;white-space:nowrap">' + formatTime(r.timestamp) + '</td>' +
+        '<td style="padding:8px 4px;font-weight:600;color:var(--pink)">' + amount + ' ml</td>' +
+        '<td style="padding:8px 4px;font-weight:600;color:var(--pink)">¥' + cost.toFixed(2) + '</td>' +
+        '</tr>';
+    });
+    html += '<tr style="font-weight:700;border-top:2px solid var(--border)">' +
+      '<td style="padding:10px 4px">当日合计</td>' +
+      '<td style="padding:10px 4px"></td>' +
+      '<td style="padding:10px 4px;color:var(--pink)">¥' + totalCost.toFixed(2) + '</td>' +
+      '</tr>';
+    html += '</tbody></table>';
+    html += '<div style="font-size:11px;color:var(--text-light);margin-top:8px;text-align:center">单价：每30ml奶粉费用 ¥' + FORMULA_COST_PER_30ML.toFixed(2) + '</div>';
+  }
+
+  html += '<div class="btn-row" style="margin-top:16px">' +
+    '<button class="btn-confirm" onclick="document.getElementById(\'formulaDetailPopup\').remove()" style="flex:1;padding:10px;border-radius:20px;font-size:14px;border:none;background:var(--pink);color:#fff;cursor:pointer">关闭</button>' +
+    '</div></div></div>';
+
+  document.body.insertAdjacentHTML('beforeend', html);
+}
+
+function closeFormulaDetail(e) {
+  if (e && e.target !== document.getElementById('formulaDetailPopup')) return;
+  var el = document.getElementById('formulaDetailPopup');
   if (el) el.remove();
 }
 
