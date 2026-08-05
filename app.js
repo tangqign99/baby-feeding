@@ -1,5 +1,5 @@
 /* ============================================
-   宝宝喂养记录 PWA - 应用逻辑 v3.33 (Supabase)
+   宝宝喂养记录 PWA - 应用逻辑 v3.34 (Supabase)
    ============================================ */
 
 const FORMULA_COST_PER_30ML = 2.28; // 30ml = 4.2g, 680g = 369元 → 每30ml费用
@@ -1631,29 +1631,37 @@ function renderStats() {
   }
   html += '</div>';
 
-  // Formula cost chart
+  // Formula cost chart — uses all milk records, not limited to last 7 days
   var formulaCostByDay = {};
-  days.forEach(function(d) { formulaCostByDay[d] = { total: 0, records: [] }; });
+  var formulaDateSet = {};
   records.forEach(function(r) {
     if (r.type === 'milk') {
       var d = formatDate(r.timestamp);
-      if (formulaCostByDay[d] !== undefined) {
-        var cost = (r.amount || 0) / 30 * FORMULA_COST_PER_30ML;
-        formulaCostByDay[d].total += cost;
-        formulaCostByDay[d].records.push(r);
-      }
+      formulaDateSet[d] = true;
+      if (!formulaCostByDay[d]) formulaCostByDay[d] = { total: 0, records: [] };
+      var cost = (r.amount || 0) / 30 * FORMULA_COST_PER_30ML;
+      formulaCostByDay[d].total += cost;
+      formulaCostByDay[d].records.push(r);
     }
   });
-  var hasFormulaCost = days.some(function(d) { return formulaCostByDay[d].total > 0; });
+  var formulaDays = Object.keys(formulaDateSet).sort(function(a, b) { return a.localeCompare(b); });
+  var hasFormulaCost = formulaDays.length > 0;
+
+  var currentMonth = new Date().getMonth();
   var monthTotal = 0;
-  days.forEach(function(d) { monthTotal += formulaCostByDay[d].total; });
+  formulaDays.forEach(function(d) {
+    var dParts = d.split('-');
+    if (parseInt(dParts[1], 10) - 1 === currentMonth) {
+      monthTotal += formulaCostByDay[d].total;
+    }
+  });
 
   html += '<div class="chart-container"><div class="chart-title">奶粉费用</div>';
   if (hasFormulaCost) {
     html += '<canvas id="formulaCostChart" width="320" height="180" style="width:100%;max-width:420px"></canvas>';
     html += '<div style="text-align:center;font-size:11px;color:var(--text-light);margin-top:4px">点击柱子查看当天详情</div>';
     html += '<div style="text-align:center;padding:6px 0;font-size:15px;font-weight:700;color:var(--pink)">本月奶粉费用 ¥' + monthTotal.toFixed(2) + '</div>';
-    window._formulaCostChartData = { dates: days, data: formulaCostByDay, monthTotal: monthTotal };
+    window._formulaCostChartData = { dates: formulaDays, data: formulaCostByDay, monthTotal: monthTotal };
   } else {
     html += '<div class="stat-empty">暂无奶粉数据</div>';
     window._formulaCostChartData = null;
