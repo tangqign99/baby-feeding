@@ -1,5 +1,5 @@
 /* ============================================
-   宝宝喂养记录 PWA - 应用逻辑 v3.32 (Supabase)
+   宝宝喂养记录 PWA - 应用逻辑 v3.33 (Supabase)
    ============================================ */
 
 const FORMULA_COST_PER_30ML = 2.28; // 30ml = 4.2g, 680g = 369元 → 每30ml费用
@@ -1631,6 +1631,35 @@ function renderStats() {
   }
   html += '</div>';
 
+  // Formula cost chart
+  var formulaCostByDay = {};
+  days.forEach(function(d) { formulaCostByDay[d] = { total: 0, records: [] }; });
+  records.forEach(function(r) {
+    if (r.type === 'milk') {
+      var d = formatDate(r.timestamp);
+      if (formulaCostByDay[d] !== undefined) {
+        var cost = (r.amount || 0) / 30 * FORMULA_COST_PER_30ML;
+        formulaCostByDay[d].total += cost;
+        formulaCostByDay[d].records.push(r);
+      }
+    }
+  });
+  var hasFormulaCost = days.some(function(d) { return formulaCostByDay[d].total > 0; });
+  var monthTotal = 0;
+  days.forEach(function(d) { monthTotal += formulaCostByDay[d].total; });
+
+  html += '<div class="chart-container"><div class="chart-title">奶粉费用</div>';
+  if (hasFormulaCost) {
+    html += '<canvas id="formulaCostChart" width="320" height="180" style="width:100%;max-width:420px"></canvas>';
+    html += '<div style="text-align:center;font-size:11px;color:var(--text-light);margin-top:4px">点击柱子查看当天详情</div>';
+    html += '<div style="text-align:center;padding:6px 0;font-size:15px;font-weight:700;color:var(--pink)">本月奶粉费用 ¥' + monthTotal.toFixed(2) + '</div>';
+    window._formulaCostChartData = { dates: days, data: formulaCostByDay, monthTotal: monthTotal };
+  } else {
+    html += '<div class="stat-empty">暂无奶粉数据</div>';
+    window._formulaCostChartData = null;
+  }
+  html += '</div>';
+
   // Weight chart
   html += '<div class="chart-container"><div class="chart-title">体重变化</div>';
   html += bmiText;
@@ -1660,6 +1689,7 @@ function renderStats() {
 
   if (hasMilk) drawMilkChart(days, milkValues, maxMilk);
   if (window._diaperChartData) drawDiaperChart(window._diaperChartData);
+  if (window._formulaCostChartData) drawFormulaCostChart(window._formulaCostChartData);
   if (window._sleepChartData) drawSleepChart(window._sleepChartData);
   if (heightData.length >= 2) drawSingleMetricChart('heightChart', heightData, 'height', '#FF6B8A', '身高(cm)');
   if (weightData.length >= 2) drawSingleMetricChart('weightChart', weightData, 'weight', '#5BA4CF', '体重(斤)');
@@ -2588,6 +2618,153 @@ function updateTimer() {
 }
 
 // ------- Service Worker -------
+function drawFormulaCostChart(chartData) {
+  var canvas = document.getElementById('formulaCostChart');
+  if (!canvas) return;
+  var ctx = canvas.getContext('2d');
+  var dpr = window.devicePixelRatio || 1;
+  var rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = 180 * dpr;
+  ctx.scale(dpr, dpr);
+  canvas.style.height = '180px';
+
+  var w = rect.width;
+  var h = 180;
+  var pad = { top: 16, right: 12, bottom: 28, left: 48 };
+  var cw = w - pad.left - pad.right;
+  var ch = h - pad.top - pad.bottom;
+  var dates = chartData.dates;
+  var data = chartData.data;
+
+  var maxCost = 0;
+  dates.forEach(function(d) { if (data[d].total > maxCost) maxCost = data[d].total; });
+  if (maxCost === 0) maxCost = 1;
+
+  var barW = Math.max(14, Math.min(32, cw / dates.length * 0.6));
+  var gap = (cw - barW * dates.length) / (dates.length + 1);
+
+  ctx.clearRect(0, 0, w, h);
+
+  ctx.strokeStyle = '#F0E8E8';
+  ctx.lineWidth = 1;
+  var gridLines = 4;
+  for (var i = 0; i <= gridLines; i++) {
+    var y = pad.top + (ch / gridLines) * i;
+    ctx.beginPath();
+    ctx.moveTo(pad.left, y);
+    ctx.lineTo(w - pad.right, y);
+    ctx.stroke();
+
+    ctx.fillStyle = '#888';
+    ctx.font = '11px sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText('¥' + (maxCost / gridLines * (gridLines - i)).toFixed(1), pad.left - 6, y + 4);
+  }
+
+  window._formulaBarPositions = [];
+
+  dates.forEach(function(d, i) {
+    var val = data[d].total;
+    var barH = val / maxCost * ch;
+    var x = pad.left + gap + i * (barW + gap);
+    var y = pad.top + ch - barH;
+
+    var gradient = ctx.createLinearGradient(x, y, x, pad.top + ch);
+    gradient.addColorStop(0, '#FF9AA2');
+    gradient.addColorStop(1, '#FFB7B2');
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.roundRect(x, y, barW, barH, [4, 4, 0, 0]);
+    ctx.fill();
+
+    ctx.fillStyle = 'rgba(0,0,0,0)';
+    ctx.fillRect(x - 4, pad.top, barW + 8, ch);
+
+    if (val > 0) {
+      ctx.fillStyle = '#4A4A4A';
+      ctx.font = '10px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('¥' + val.toFixed(2), x + barW / 2, y - 4);
+    }
+
+    ctx.fillStyle = '#888';
+    ctx.font = '10px sans-serif';
+    ctx.textAlign = 'center';
+    var dateParts = d.split('-');
+    var dateLabel = (parseInt(dateParts[1], 10)) + '/' + (parseInt(dateParts[2], 10));
+    ctx.fillText(dateLabel, x + barW / 2, pad.top + ch + 18);
+
+    window._formulaBarPositions.push({ date: d, x: x, w: barW });
+  });
+
+  canvas.style.cursor = 'pointer';
+  canvas.onclick = function(e) {
+    var cr = canvas.getBoundingClientRect();
+    var clickX = e.clientX - cr.left;
+    var bars = window._formulaBarPositions;
+    if (!bars) return;
+    for (var j = 0; j < bars.length; j++) {
+      var b = bars[j];
+      if (clickX >= b.x - 6 && clickX <= b.x + b.w + 6) {
+        showDayFormulaDetail(b.date);
+        return;
+      }
+    }
+  };
+}
+
+function showDayFormulaDetail(dateStr) {
+  var existing = document.getElementById('formulaDetailPopup');
+  if (existing) existing.remove();
+
+  var records = getRecords();
+  var dayRecords = records.filter(function(r) {
+    return r.type === 'milk' && formatDate(r.timestamp) === dateStr;
+  }).sort(function(a, b) { return a.timestamp - b.timestamp; });
+
+  var d = new Date(dateStr + 'T00:00:00');
+  var title = (d.getMonth() + 1) + '月' + d.getDate() + '日 奶粉费用详情';
+
+  var html = '<div class="modal-overlay show" id="formulaDetailPopup" onclick="closeFormulaDetail(event)">' +
+    '<div class="modal-box" style="max-height:70vh;overflow-y:auto" onclick="event.stopPropagation()">' +
+    '<h3 style="margin-bottom:12px">' + title + '</h3>';
+
+  if (dayRecords.length === 0) {
+    html += '<div style="text-align:center;padding:20px;color:var(--text-light)">当天无奶量记录</div>';
+  } else {
+    var totalCost = 0;
+    html += '<table style="width:100%;font-size:13px;border-collapse:collapse">';
+    html += '<thead><tr style="border-bottom:2px solid #F0E8E8;text-align:left;color:var(--text-light);font-size:11px"><th style="padding:8px 4px">时间</th><th style="padding:8px 4px">奶量</th><th style="padding:8px 4px">费用</th></tr></thead><tbody>';
+    dayRecords.forEach(function(r) {
+      var cost = (r.amount || 0) / 30 * FORMULA_COST_PER_30ML;
+      totalCost += cost;
+      html += '<tr style="border-bottom:1px solid var(--border)">' +
+        '<td style="padding:8px 4px;white-space:nowrap">' + formatTime(r.timestamp) + '</td>' +
+        '<td style="padding:8px 4px;font-weight:600;color:var(--pink)">' + (r.amount || 0) + ' ml</td>' +
+        '<td style="padding:8px 4px;font-weight:600;color:var(--pink)">¥' + cost.toFixed(2) + '</td>' +
+        '</tr>';
+    });
+    html += '<tr style="font-weight:700;border-top:2px solid var(--border)">' +
+      '<td style="padding:10px 4px">当日合计</td>' +
+      '<td style="padding:10px 4px"></td>' +
+      '<td style="padding:10px 4px;color:var(--pink)">¥' + totalCost.toFixed(2) + '</td></tr>';
+    html += '</tbody></table>';
+  }
+
+  html += '<div class="btn-row" style="margin-top:16px">' +
+    '<button class="btn-confirm" onclick="document.getElementById(\'formulaDetailPopup\').remove()" style="flex:1;padding:10px;border-radius:20px;font-size:14px;border:none;background:var(--pink);color:#fff;cursor:pointer">关闭</button>' +
+    '</div></div></div>';
+
+  document.body.insertAdjacentHTML('beforeend', html);
+}
+
+function closeFormulaDetail(e) {
+  if (e && e.target !== document.getElementById('formulaDetailPopup')) return;
+  var el = document.getElementById('formulaDetailPopup');
+  if (el) el.remove();
+}
+
 function registerSW() {
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('./sw.js', { scope: './' }).then(function(reg) {
