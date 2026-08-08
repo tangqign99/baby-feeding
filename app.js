@@ -1508,22 +1508,7 @@ function renderStats() {
     });
 
     var sleepDates = Object.keys(sleepByDay).sort();
-    var totalNight = 0, totalDay = 0;
-    sleepDates.forEach(function(d) {
-      totalNight += sleepByDay[d].night;
-      totalDay += sleepByDay[d].day;
-    });
-    var totalSleep = totalNight + totalDay;
-    var dayCount = sleepDates.length;
-    var avgSleep = dayCount > 0 ? totalSleep / dayCount : 0;
 
-    function fmtDur(ms) {
-      var h = Math.floor(ms / 3600000);
-      var m = Math.floor((ms % 3600000) / 60000);
-      return h + 'h' + m + 'm';
-    }
-
-    html += '<div class="sleep-summary-grid"><div>日均睡眠</div><div>' + fmtDur(avgSleep) + '</div><div>夜间</div><div>' + fmtDur(totalNight) + '</div><div>白天</div><div>' + fmtDur(totalDay) + '</div><div>总睡眠</div><div>' + fmtDur(totalSleep) + '</div></div>';
     html += '<canvas id="sleepChart" width="360" height="200" style="width:100%;max-width:420px"></canvas>';
     html += '<div style="text-align:center;font-size:11px;color:var(--text-light);margin:4px 0 10px">点击柱子查看当天详情</div>';
 
