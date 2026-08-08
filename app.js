@@ -1370,15 +1370,6 @@ function renderTimeline() {
 }
 
 // ------- Stats -------
-var sleepFilterMode = '7days';
-var sleepFilterStart = '';
-var sleepFilterEnd = '';
-var diaperFilterMode = '7days';
-var diaperFilterStart = '';
-var diaperFilterEnd = '';
-var formulaCostFilterMode = '7days';
-var formulaCostFilterStart = '';
-var formulaCostFilterEnd = '';
 
 function getDateRange(mode, customStart, customEnd) {
   var now = new Date();
@@ -1414,86 +1405,6 @@ function getDateRange(mode, customStart, customEnd) {
       startTs = endTs - 7 * 86400000;
   }
   return { start: startTs, end: endTs };
-}
-
-function buildFilterHTML(prefix, mode, startVal, endVal) {
-  var modes = [
-    { id: '3days', label: '最近3天' },
-    { id: '7days', label: '最近7天' },
-    { id: '30days', label: '最近30天' },
-    { id: 'month', label: '本月' },
-    { id: 'custom', label: '自定义' }
-  ];
-  var capPrefix = prefix.charAt(0).toUpperCase() + prefix.slice(1);
-  var h = '<div class="filter-bar">';
-  modes.forEach(function(m) {
-    h += '<button class="filter-btn' + (mode === m.id ? ' active' : '') +
-      '" onclick="set' + capPrefix + 'Filter(\'' + m.id + '\')">' + m.label + '</button>';
-  });
-  h += '</div>';
-  if (mode === 'custom') {
-    h += '<div class="filter-date-row">' +
-      '<input type="date" id="' + prefix + 'Start" value="' + (startVal || '') + '" title="开始日期">' +
-      '<span style="font-size:12px;color:var(--text-light)">至</span>' +
-      '<input type="date" id="' + prefix + 'End" value="' + (endVal || '') + '" title="结束日期">' +
-      '<button onclick="apply' + capPrefix + 'Custom()">确定</button>' +
-      '</div>';
-  }
-  return h;
-}
-
-function setSleepFilter(mode) {
-  sleepFilterMode = mode;
-  if (mode !== 'custom') { sleepFilterStart = ''; sleepFilterEnd = ''; }
-  renderStats();
-}
-
-function applySleepCustom() {
-  var s = document.getElementById('sleepStart');
-  var e = document.getElementById('sleepEnd');
-  if (s && e && s.value && e.value) {
-    sleepFilterStart = s.value;
-    sleepFilterEnd = e.value;
-    renderStats();
-  } else {
-    toast('请选择完整的日期范围', 'warning');
-  }
-}
-
-function setDiaperFilter(mode) {
-  diaperFilterMode = mode;
-  if (mode !== 'custom') { diaperFilterStart = ''; diaperFilterEnd = ''; }
-  renderStats();
-}
-
-function applyDiaperCustom() {
-  var s = document.getElementById('diaperStart');
-  var e = document.getElementById('diaperEnd');
-  if (s && e && s.value && e.value) {
-    diaperFilterStart = s.value;
-    diaperFilterEnd = e.value;
-    renderStats();
-  } else {
-    toast('请选择完整的日期范围', 'warning');
-  }
-}
-
-function setFormulaCostFilter(mode) {
-  formulaCostFilterMode = mode;
-  if (mode !== 'custom') { formulaCostFilterStart = ''; formulaCostFilterEnd = ''; }
-  renderStats();
-}
-
-function applyFormulaCostCustom() {
-  var s = document.getElementById('formulaCostStart');
-  var e = document.getElementById('formulaCostEnd');
-  if (s && e && s.value && e.value) {
-    formulaCostFilterStart = s.value;
-    formulaCostFilterEnd = e.value;
-    renderStats();
-  } else {
-    toast('请选择完整的日期范围', 'warning');
-  }
 }
 
 function renderStats() {
@@ -1571,7 +1482,7 @@ function renderStats() {
   var allSleepRecords = records.filter(function(r) { return r.type === 'sleep'; }).sort(function(a, b) { return b.timestamp - a.timestamp; });
   html += '<div class="chart-container"><div class="chart-title">睡眠记录</div>';
 
-  var sleepRange = getDateRange(sleepFilterMode, sleepFilterStart, sleepFilterEnd);
+  var sleepRange = getDateRange('7days');
   var sleepRecords = allSleepRecords.filter(function(r) {
     var ts = r.sleep_start || r.timestamp;
     return ts >= sleepRange.start && ts <= sleepRange.end;
@@ -1613,13 +1524,11 @@ function renderStats() {
     }
 
     html += '<div class="sleep-summary-grid"><div>日均睡眠</div><div>' + fmtDur(avgSleep) + '</div><div>夜间</div><div>' + fmtDur(totalNight) + '</div><div>白天</div><div>' + fmtDur(totalDay) + '</div><div>总睡眠</div><div>' + fmtDur(totalSleep) + '</div></div>';
-    html += buildFilterHTML('sleep', sleepFilterMode, sleepFilterStart, sleepFilterEnd);
     html += '<canvas id="sleepChart" width="360" height="200" style="width:100%;max-width:420px"></canvas>';
     html += '<div style="text-align:center;font-size:11px;color:var(--text-light);margin:4px 0 10px">点击柱子查看当天详情</div>';
 
     window._sleepChartData = { dates: sleepDates, data: sleepByDay };
   } else {
-    html += buildFilterHTML('sleep', sleepFilterMode, sleepFilterStart, sleepFilterEnd);
     html += '<div class="record-empty">暂无睡眠数据</div>';
   }
   html += '</div>';
@@ -1628,11 +1537,10 @@ function renderStats() {
   var allDiaperRecords = records.filter(function(r) { return r.type === 'diaper'; }).sort(function(a, b) { return b.timestamp - a.timestamp; });
   html += '<div class="chart-container"><div class="chart-title">尿布统计</div>';
 
-  var diaperRange = getDateRange(diaperFilterMode, diaperFilterStart, diaperFilterEnd);
+  var diaperRange = getDateRange('7days');
   var diaperRecords = allDiaperRecords.filter(function(r) {
     return r.timestamp >= diaperRange.start && r.timestamp <= diaperRange.end;
   });
-  html += buildFilterHTML('diaper', diaperFilterMode, diaperFilterStart, diaperFilterEnd);
 
   if (diaperRecords.length > 0) {
     // Group by date
@@ -1675,8 +1583,8 @@ function renderStats() {
   });
   var formulaDays = Object.keys(formulaDateSet).sort(function(a, b) { return a.localeCompare(b); });
 
-  // Filter by date range
-  var formulaRange = getDateRange(formulaCostFilterMode, formulaCostFilterStart, formulaCostFilterEnd);
+  // Filter by date range (fixed: last 7 days)
+  var formulaRange = getDateRange('7days');
   var formulaFilteredDays = formulaDays.filter(function(d) {
     var ts = new Date(d + 'T00:00:00').getTime();
     return ts >= formulaRange.start && ts <= formulaRange.end;
@@ -1693,7 +1601,6 @@ function renderStats() {
   });
 
   html += '<div class="chart-container"><div class="chart-title">奶粉费用</div>';
-  html += buildFilterHTML('formulaCost', formulaCostFilterMode, formulaCostFilterStart, formulaCostFilterEnd);
   if (hasFormulaCost) {
     html += '<canvas id="formulaCostChart" width="320" height="180" style="width:100%;max-width:420px"></canvas>';
     html += '<div style="text-align:center;font-size:11px;color:var(--text-light);margin-top:4px">点击柱子查看当天详情</div>';
@@ -2832,38 +2739,63 @@ function queryDayRecords() {
   var matched = records.filter(function(r) {
     return formatDate(r.timestamp) === selectedDate;
   });
-  matched.sort(function(a, b) { return b.timestamp - a.timestamp; });
 
-  document.getElementById('queryModalTitle').textContent = selectedDate + ' 记录';
+  // Build summary
+  var milkTotal = 0, mealCount = 0, snackCount = 0, diaperCount = 0;
+  var sleepTotalMs = 0;
+
+  matched.forEach(function(r) {
+    if (r.type === 'milk') milkTotal += (r.amount || 0);
+    else if (r.type === 'meal') mealCount++;
+    else if (r.type === 'snack') snackCount++;
+    else if (r.type === 'diaper') diaperCount++;
+    else if (r.type === 'sleep') {
+      if (r.sleep_start && r.sleep_end) sleepTotalMs += (r.sleep_end - r.sleep_start);
+    }
+  });
+
+  function fmtDur(ms) {
+    var h = Math.floor(ms / 3600000);
+    var m = Math.floor((ms % 3600000) / 60000);
+    return h + 'h' + m + 'm';
+  }
+
+  document.getElementById('queryModalTitle').textContent = selectedDate + ' 记录汇总';
   var bodyEl = document.getElementById('queryModalBody');
   var html = '';
 
   if (matched.length === 0) {
     html = '<div class="query-empty">当日无记录</div>';
   } else {
-    matched.forEach(function(r) {
-      var desc = buildRecordDesc(r);
-      var noteHtml = '';
-      if (r.note) {
-        noteHtml = '<div style="font-size:12px;color:var(--text-light);margin-top:2px">' + escapeHtml(r.note) + '</div>';
-      }
-      html +=
-        '<div class="query-result-item">' +
-        '<div class="qr-icon">' + getTypeIcon(r.type) + '</div>' +
-        '<div class="qr-body">' +
-        '<div class="qr-type">' + getTypeName(r.type) + '</div>' +
-        '<div class="qr-detail">' + desc + '</div>' +
-        noteHtml +
-        '<div class="qr-time">' + formatTime(r.timestamp) + '</div>' +
-        '</div>' +
-        '</div>';
-    });
+    html += '<div class="dash-summary" style="margin-bottom:0">';
+
+    html += '<div class="dash-item" style="cursor:pointer" onclick="showQueryTypeDetail(\'' + selectedDate + '\',\'milk\')">' +
+      '<div class="value" style="font-size:22px">' + milkTotal + '<span class="unit">ml</span></div>' +
+      '<div class="label">🍼 奶量</div></div>';
+
+    html += '<div class="dash-item" style="cursor:pointer" onclick="showQueryTypeDetail(\'' + selectedDate + '\',\'meal\')">' +
+      '<div class="value" style="font-size:22px">' + mealCount + '<span class="unit">次</span></div>' +
+      '<div class="label">🍚 吃饭</div></div>';
+
+    html += '<div class="dash-item" style="cursor:pointer" onclick="showQueryTypeDetail(\'' + selectedDate + '\',\'snack\')">' +
+      '<div class="value" style="font-size:22px">' + snackCount + '<span class="unit">次</span></div>' +
+      '<div class="label">🥄 辅食</div></div>';
+
+    html += '<div class="dash-item" style="cursor:pointer" onclick="showQueryTypeDetail(\'' + selectedDate + '\',\'sleep\')">' +
+      '<div class="value" style="font-size:14px;font-weight:700">' + fmtDur(sleepTotalMs) + '</div>' +
+      '<div class="label">💤 睡眠</div></div>';
+
+    html += '<div class="dash-item" style="cursor:pointer" onclick="showQueryTypeDetail(\'' + selectedDate + '\',\'diaper\')">' +
+      '<div class="value" style="font-size:22px">' + diaperCount + '<span class="unit">次</span></div>' +
+      '<div class="label">🧷 尿布</div></div>';
+
+    html += '</div>';
+    html += '<div style="text-align:center;font-size:11px;color:var(--text-light);margin-top:8px">点击卡片查看详情</div>';
   }
 
   bodyEl.innerHTML = html;
   document.getElementById('queryModalOverlay').classList.add('show');
 
-  // Close on overlay click
   document.getElementById('queryModalOverlay').onclick = function(e) {
     if (e.target === this) closeQueryModal();
   };
@@ -2871,6 +2803,69 @@ function queryDayRecords() {
 
 function closeQueryModal() {
   document.getElementById('queryModalOverlay').classList.remove('show');
+}
+
+function showQueryTypeDetail(dateStr, type) {
+  var records = getRecords();
+  var typeName = getTypeName(type);
+
+  var dayRecords;
+  if (type === 'meal') {
+    dayRecords = records.filter(function(r) {
+      return (r.type === 'meal' || r.type === 'snack') && formatDate(r.timestamp) === dateStr;
+    }).sort(function(a, b) { return a.timestamp - b.timestamp; });
+  } else {
+    dayRecords = records.filter(function(r) {
+      return r.type === type && formatDate(r.timestamp) === dateStr;
+    }).sort(function(a, b) { return a.timestamp - b.timestamp; });
+  }
+
+  var html = '<div class="modal-overlay show" id="queryTypeDetailPopup" onclick="closeQueryTypeDetail(event)">' +
+    '<div class="modal-box" style="max-height:70vh;overflow-y:auto" onclick="event.stopPropagation()">' +
+    '<h3 style="margin-bottom:12px">' + dateStr + ' ' + typeName + '详情</h3>';
+
+  if (dayRecords.length === 0) {
+    html += '<div style="text-align:center;padding:20px;color:var(--text-light)">暂无' + typeName + '记录</div>';
+  } else if (type === 'sleep') {
+    html += '<table style="width:100%;font-size:13px;border-collapse:collapse">';
+    html += '<thead><tr style="border-bottom:2px solid #F0E8E8;text-align:left;color:var(--text-light);font-size:11px"><th style="padding:8px 4px">入睡</th><th style="padding:8px 4px">醒来</th><th style="padding:8px 4px">时长</th><th style="padding:8px 4px">备注</th></tr></thead><tbody>';
+    dayRecords.forEach(function(r) {
+      var dur = (r.sleep_start && r.sleep_end && r.sleep_end > r.sleep_start) ? (r.sleep_end - r.sleep_start) : 0;
+      var h = Math.floor(dur / 3600000);
+      var m = Math.floor((dur % 3600000) / 60000);
+      html += '<tr style="border-bottom:1px solid var(--border)">' +
+        '<td style="padding:8px 4px;white-space:nowrap">' + (r.sleep_start ? formatTime(r.sleep_start) : '') + '</td>' +
+        '<td style="padding:8px 4px;white-space:nowrap">' + (r.sleep_end ? formatTime(r.sleep_end) : '') + '</td>' +
+        '<td style="padding:8px 4px;font-weight:600;color:var(--pink)">' + h + 'h' + m + 'm</td>' +
+        '<td style="padding:8px 4px;color:var(--text-light);font-size:12px">' + (r.note || '') + '</td>' +
+        '</tr>';
+    });
+    html += '</tbody></table>';
+  } else {
+    html += '<table style="width:100%;font-size:13px;border-collapse:collapse">';
+    html += '<thead><tr style="border-bottom:2px solid #F0E8E8;text-align:left;color:var(--text-light);font-size:11px"><th style="padding:8px 4px">时间</th><th style="padding:8px 4px">内容</th><th style="padding:8px 4px">备注</th></tr></thead><tbody>';
+    dayRecords.forEach(function(r) {
+      var desc = buildRecordDesc(r);
+      html += '<tr style="border-bottom:1px solid var(--border)">' +
+        '<td style="padding:8px 4px;white-space:nowrap">' + formatTime(r.timestamp) + '</td>' +
+        '<td style="padding:8px 4px;font-weight:600;color:var(--pink)">' + desc + '</td>' +
+        '<td style="padding:8px 4px;color:var(--text-light);font-size:12px">' + (r.note || '') + '</td>' +
+        '</tr>';
+    });
+    html += '</tbody></table>';
+  }
+
+  html += '<div class="btn-row" style="margin-top:16px">' +
+    '<button class="btn-confirm" onclick="document.getElementById(\'queryTypeDetailPopup\').remove()" style="flex:1;padding:10px;border-radius:20px;font-size:14px;border:none;background:var(--pink);color:#fff;cursor:pointer">关闭</button>' +
+    '</div></div></div>';
+
+  document.body.insertAdjacentHTML('beforeend', html);
+}
+
+function closeQueryTypeDetail(e) {
+  if (e && e.target !== document.getElementById('queryTypeDetailPopup')) return;
+  var el = document.getElementById('queryTypeDetailPopup');
+  if (el) el.remove();
 }
 
 // ------- Init -------
