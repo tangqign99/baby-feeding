@@ -1,5 +1,5 @@
 /* ============================================
-   宝宝喂养记录 PWA - 应用逻辑 v3.36 (Supabase)
+   宝宝喂养记录 PWA - 应用逻辑 v3.37 (Supabase)
    ============================================ */
 
 const FORMULA_COST_PER_30ML = 2.28; // 30ml = 4.2g, 680g = 369元 → 每30ml费用
@@ -2818,6 +2818,59 @@ function registerSW() {
       // SW registration failed
     });
   }
+}
+
+// ------- Query Day Records -------
+function queryDayRecords() {
+  var dateInput = document.getElementById('queryDate');
+  if (!dateInput || !dateInput.value) {
+    toast('请选择日期', 'warning');
+    return;
+  }
+  var selectedDate = dateInput.value;
+  var records = getRecords();
+  var matched = records.filter(function(r) {
+    return formatDate(r.timestamp) === selectedDate;
+  });
+  matched.sort(function(a, b) { return b.timestamp - a.timestamp; });
+
+  document.getElementById('queryModalTitle').textContent = selectedDate + ' 记录';
+  var bodyEl = document.getElementById('queryModalBody');
+  var html = '';
+
+  if (matched.length === 0) {
+    html = '<div class="query-empty">当日无记录</div>';
+  } else {
+    matched.forEach(function(r) {
+      var desc = buildRecordDesc(r);
+      var noteHtml = '';
+      if (r.note) {
+        noteHtml = '<div style="font-size:12px;color:var(--text-light);margin-top:2px">' + escapeHtml(r.note) + '</div>';
+      }
+      html +=
+        '<div class="query-result-item">' +
+        '<div class="qr-icon">' + getTypeIcon(r.type) + '</div>' +
+        '<div class="qr-body">' +
+        '<div class="qr-type">' + getTypeName(r.type) + '</div>' +
+        '<div class="qr-detail">' + desc + '</div>' +
+        noteHtml +
+        '<div class="qr-time">' + formatTime(r.timestamp) + '</div>' +
+        '</div>' +
+        '</div>';
+    });
+  }
+
+  bodyEl.innerHTML = html;
+  document.getElementById('queryModalOverlay').classList.add('show');
+
+  // Close on overlay click
+  document.getElementById('queryModalOverlay').onclick = function(e) {
+    if (e.target === this) closeQueryModal();
+  };
+}
+
+function closeQueryModal() {
+  document.getElementById('queryModalOverlay').classList.remove('show');
 }
 
 // ------- Init -------

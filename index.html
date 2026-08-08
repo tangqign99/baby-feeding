@@ -407,6 +407,37 @@ body {
 .modal-box .btn-row button { flex:1; padding:10px; border-radius:20px; font-size:14px; cursor:pointer; border:none; }
 .modal-box .btn-cancel { background:#f5f5f5; color:var(--text); }
 .modal-box .btn-confirm { background:var(--pink); color:#fff; }
+/* Query Modal */
+.query-modal-overlay {
+  position:fixed; inset:0; background:rgba(0,0,0,0.4); z-index:9998;
+  display:none; align-items:center; justify-content:center;
+}
+.query-modal-overlay.show { display:flex; }
+.query-modal-box {
+  background:var(--card); border-radius:var(--radius); padding:20px;
+  width:90%; max-width:420px; max-height:80vh; overflow-y:auto;
+  box-shadow:0 8px 32px rgba(0,0,0,0.2);
+}
+.query-modal-header {
+  display:flex; align-items:center; justify-content:space-between;
+  margin-bottom:12px; padding-bottom:10px; border-bottom:1px solid var(--border);
+}
+.query-modal-header h3 { font-size:17px; }
+.query-modal-close {
+  background:none; border:none; font-size:22px; cursor:pointer;
+  color:var(--text-light); padding:4px 8px; border-radius:8px;
+}
+.query-modal-close:active { background:#f5f5f5; }
+.query-result-item {
+  display:flex; align-items:center; gap:10px; padding:10px;
+  background:var(--bg); border-radius:var(--radius-sm); margin-bottom:6px;
+}
+.query-result-item .qr-icon { font-size:22px; min-width:30px; text-align:center; }
+.query-result-item .qr-body { flex:1; min-width:0; }
+.query-result-item .qr-type { font-size:11px; color:var(--pink); font-weight:600; margin-bottom:2px; }
+.query-result-item .qr-detail { font-size:14px; font-weight:500; }
+.query-result-item .qr-time { font-size:12px; color:var(--text-light); }
+.query-empty { text-align:center; padding:24px; color:var(--text-light); font-size:14px; }
 </style>
 </head>
 <body>
@@ -488,6 +519,13 @@ body {
       </div>
     </div>
     <div class="card">
+      <div class="card-title">记录查询</div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input type="date" id="queryDate" style="flex:1;padding:10px;border:2px solid var(--border);border-radius:var(--radius-sm);font-size:14px;outline:none;background:var(--card);color:var(--text)">
+        <button onclick="queryDayRecords()" style="padding:10px 20px;background:var(--pink);color:#fff;border:none;border-radius:var(--radius-sm);font-size:14px;font-weight:500;cursor:pointer">查询</button>
+      </div>
+    </div>
+    <div class="card">
       <div class="card-title">奶粉费用</div>
       <div class="setting-item">
         <div class="label">每30ml奶粉费用</div>
@@ -507,6 +545,16 @@ body {
     <button class="btn-danger" onclick="clearAllData()">清空所有数据</button>
     <div style="text-align:center;padding:16px;font-size:12px;color:var(--text-light)">
       宝宝喂养记录 v3.10 · 数据云端同步 (Supabase)
+    </div>
+    <!-- Query Record Modal -->
+    <div class="query-modal-overlay" id="queryModalOverlay">
+      <div class="query-modal-box">
+        <div class="query-modal-header">
+          <h3 id="queryModalTitle">记录查询</h3>
+          <button class="query-modal-close" onclick="closeQueryModal()">&times;</button>
+        </div>
+        <div id="queryModalBody"></div>
+      </div>
     </div>
   </div>
 
@@ -534,7 +582,7 @@ body {
 
 <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-  <script src="./app.js?v=3.36"></script>
+  <script src="./app.js?v=3.37"></script>
   <script>
     // Service Worker 注册
     if ('serviceWorker' in navigator) {
