@@ -1,5 +1,5 @@
 /* ============================================
-   宝宝喂养记录 PWA - 应用逻辑 v3.35 (Supabase)
+   宝宝喂养记录 PWA - 应用逻辑 v3.36 (Supabase)
    ============================================ */
 
 const FORMULA_COST_PER_30ML = 2.28; // 30ml = 4.2g, 680g = 369元 → 每30ml费用
@@ -1370,10 +1370,10 @@ function renderTimeline() {
 }
 
 // ------- Stats -------
-var sleepFilterMode = '3days';
+var sleepFilterMode = '7days';
 var sleepFilterStart = '';
 var sleepFilterEnd = '';
-var diaperFilterMode = '3days';
+var diaperFilterMode = '7days';
 var diaperFilterStart = '';
 var diaperFilterEnd = '';
 var formulaCostFilterMode = '7days';
@@ -1478,6 +1478,24 @@ function applyDiaperCustom() {
   }
 }
 
+function setFormulaCostFilter(mode) {
+  formulaCostFilterMode = mode;
+  if (mode !== 'custom') { formulaCostFilterStart = ''; formulaCostFilterEnd = ''; }
+  renderStats();
+}
+
+function applyFormulaCostCustom() {
+  var s = document.getElementById('formulaCostStart');
+  var e = document.getElementById('formulaCostEnd');
+  if (s && e && s.value && e.value) {
+    formulaCostFilterStart = s.value;
+    formulaCostFilterEnd = e.value;
+    renderStats();
+  } else {
+    toast('请选择完整的日期范围', 'warning');
+  }
+}
+
 function renderStats() {
   var container = document.getElementById('statsContent');
   var records = getRecords();
@@ -1553,11 +1571,17 @@ function renderStats() {
   var allSleepRecords = records.filter(function(r) { return r.type === 'sleep'; }).sort(function(a, b) { return b.timestamp - a.timestamp; });
   html += '<div class="chart-container"><div class="chart-title">睡眠记录</div>';
 
-  // Sleep summary metrics & bar chart (all records, no date filter)
+  var sleepRange = getDateRange(sleepFilterMode, sleepFilterStart, sleepFilterEnd);
+  var sleepRecords = allSleepRecords.filter(function(r) {
+    var ts = r.sleep_start || r.timestamp;
+    return ts >= sleepRange.start && ts <= sleepRange.end;
+  });
+
+  // Sleep summary metrics & bar chart
   window._sleepChartData = null;
-  if (allSleepRecords.length > 0) {
+  if (sleepRecords.length > 0) {
     var sleepByDay = {};
-    allSleepRecords.forEach(function(r) {
+    sleepRecords.forEach(function(r) {
       var startTs = r.sleep_start || r.timestamp;
       var endTs = r.sleep_end;
       var d = formatDate(startTs);
@@ -1588,11 +1612,14 @@ function renderStats() {
       return h + 'h' + m + 'm';
     }
 
+    html += '<div class="sleep-summary-grid"><div>日均睡眠</div><div>' + fmtDur(avgSleep) + '</div><div>夜间</div><div>' + fmtDur(totalNight) + '</div><div>白天</div><div>' + fmtDur(totalDay) + '</div><div>总睡眠</div><div>' + fmtDur(totalSleep) + '</div></div>';
+    html += buildFilterHTML('sleep', sleepFilterMode, sleepFilterStart, sleepFilterEnd);
     html += '<canvas id="sleepChart" width="360" height="200" style="width:100%;max-width:420px"></canvas>';
     html += '<div style="text-align:center;font-size:11px;color:var(--text-light);margin:4px 0 10px">点击柱子查看当天详情</div>';
 
     window._sleepChartData = { dates: sleepDates, data: sleepByDay };
   } else {
+    html += buildFilterHTML('sleep', sleepFilterMode, sleepFilterStart, sleepFilterEnd);
     html += '<div class="record-empty">暂无睡眠数据</div>';
   }
   html += '</div>';
@@ -1600,10 +1627,17 @@ function renderStats() {
   // Diaper stats
   var allDiaperRecords = records.filter(function(r) { return r.type === 'diaper'; }).sort(function(a, b) { return b.timestamp - a.timestamp; });
   html += '<div class="chart-container"><div class="chart-title">尿布统计</div>';
-  if (allDiaperRecords.length > 0) {
+
+  var diaperRange = getDateRange(diaperFilterMode, diaperFilterStart, diaperFilterEnd);
+  var diaperRecords = allDiaperRecords.filter(function(r) {
+    return r.timestamp >= diaperRange.start && r.timestamp <= diaperRange.end;
+  });
+  html += buildFilterHTML('diaper', diaperFilterMode, diaperFilterStart, diaperFilterEnd);
+
+  if (diaperRecords.length > 0) {
     // Group by date
     var diaperByDate = {};
-    allDiaperRecords.forEach(function(r) {
+    diaperRecords.forEach(function(r) {
       var d = formatDate(r.timestamp);
       if (!diaperByDate[d]) diaperByDate[d] = { pee: 0, poop: 0, total: 0, records: [] };
       var dt = r.diaper_type || '';
