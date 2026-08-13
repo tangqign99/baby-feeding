@@ -1578,7 +1578,7 @@ function renderStats() {
 
   var currentMonth = new Date().getMonth();
   var monthTotal = 0;
-  formulaFilteredDays.forEach(function(d) {
+  formulaDays.forEach(function(d) {
     var dParts = d.split('-');
     if (parseInt(dParts[1], 10) - 1 === currentMonth) {
       monthTotal += formulaCostByDay[d].total;
