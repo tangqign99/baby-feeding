@@ -1,5 +1,5 @@
 /* ============================================
-   宝宝喂养记录 PWA - 应用逻辑 v3.39 (Supabase)
+   宝宝喂养记录 PWA - 应用逻辑 v3.40 (Supabase)
    ============================================ */
 
 const FORMULA_COST_PER_30ML = 2.28; // 30ml = 4.2g, 680g = 369元 → 每30ml费用
@@ -1479,6 +1479,10 @@ function getDateRange(mode, customStart, customEnd) {
       var monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
       startTs = monthStart.getTime();
       break;
+    case 'lastmonth':
+      startTs = new Date(now.getFullYear(), now.getMonth() - 1, 1).getTime();
+      endTs = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59).getTime();
+      break;
     case 'custom':
       if (customStart && customEnd) {
         startTs = new Date(customStart + 'T00:00:00').getTime();
@@ -1494,16 +1498,73 @@ function getDateRange(mode, customStart, customEnd) {
   return { start: startTs, end: endTs };
 }
 
+var statsRange = { mode: '7days', customStart: '', customEnd: '' };
+
+function getStatsRange() {
+  return getDateRange(statsRange.mode, statsRange.customStart, statsRange.customEnd);
+}
+
+function setStatsRange(mode, customStart, customEnd) {
+  statsRange.mode = mode;
+  if (customStart !== undefined) statsRange.customStart = customStart;
+  if (customEnd !== undefined) statsRange.customEnd = customEnd;
+  renderStats();
+}
+
+function getStatsRangeLabel(m) {
+  var labels = { '7days': '近7天', 'month': '本月', 'lastmonth': '上月', 'custom': '自定义' };
+  return labels[m] || '近7天';
+}
+
+function applyCustomStatsRange() {
+  var s = document.getElementById('statsCustomStart');
+  var e = document.getElementById('statsCustomEnd');
+  var sv = s ? s.value : '';
+  var ev = e ? e.value : '';
+  if (!sv || !ev) { toast('请选择起止日期', 'warning'); return; }
+  if (sv > ev) { toast('开始日期不能晚于结束日期', 'warning'); return; }
+  statsRange.mode = 'custom';
+  statsRange.customStart = sv;
+  statsRange.customEnd = ev;
+  renderStats();
+}
+
+function buildStatsRangeUI() {
+  var m = statsRange.mode;
+  var modes = [['7days', '近7天'], ['month', '本月'], ['lastmonth', '上月'], ['custom', '自定义']];
+  var html = '<div class="chart-container" style="margin-bottom:12px"><div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">';
+  modes.forEach(function(mm) {
+    var active = m === mm[0] ? 'style="background:var(--pink);color:#fff;border-color:var(--pink)"' : 'style="background:var(--card);color:var(--text);border-color:var(--border)"';
+    html += '<button onclick="setStatsRange(\'' + mm[0] + '\')" ' + active + ' style="padding:8px 16px;border-radius:18px;border:1.5px solid;font-size:13px;cursor:pointer">' + mm[1] + '</button>';
+  });
+  html += '</div>';
+  if (m === 'custom') {
+    html += '<div style="display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap">' +
+      '<input type="date" id="statsCustomStart" value="' + (statsRange.customStart || '') + '" style="flex:1;min-width:130px;padding:8px;border:2px solid var(--border);border-radius:10px;font-size:13px;background:var(--card);color:var(--text)">' +
+      '<span style="color:var(--text-light)">至</span>' +
+      '<input type="date" id="statsCustomEnd" value="' + (statsRange.customEnd || '') + '" style="flex:1;min-width:130px;padding:8px;border:2px solid var(--border);border-radius:10px;font-size:13px;background:var(--card);color:var(--text)">' +
+      '<button onclick="applyCustomStatsRange()" style="padding:8px 18px;background:var(--pink);color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:500;cursor:pointer">应用</button>' +
+      '</div>';
+  }
+  html += '<div style="text-align:center;font-size:11px;color:var(--text-light);margin-top:8px">当前区间：' + getStatsRangeLabel(m) +
+    (m === 'custom' && statsRange.customStart ? ' (' + statsRange.customStart + ' ~ ' + statsRange.customEnd + ')' : '') + '</div>';
+  html += '</div>';
+  return html;
+}
+
 function renderStats() {
   var container = document.getElementById('statsContent');
   var records = getRecords();
+  var range = getStatsRange();
+  var rangeLabel = getStatsRangeLabel(statsRange.mode);
 
-  // Milk chart: last 7 days
+  // 区间内所有天（按天聚合）
   var days = [];
-  for (var i = 6; i >= 0; i--) {
-    var d = new Date();
-    d.setDate(d.getDate() - i);
-    days.push(formatDate(d.getTime()));
+  var _cur = new Date(range.start);
+  var _endD = new Date(range.end);
+  while (_cur.getTime() <= _endD.getTime()) {
+    days.push(formatDate(_cur.getTime()));
+    _cur.setDate(_cur.getDate() + 1);
   }
 
   var milkByDay = {};
@@ -1551,12 +1612,14 @@ function renderStats() {
 
   var html = '';
 
+  html += buildStatsRangeUI();
+
   // Milk bar chart
   var milkValues = days.map(function(d) { return milkByDay[d]; });
   var maxMilk = Math.max.apply(null, milkValues.concat([1]));
   var hasMilk = milkValues.some(function(v) { return v > 0; });
 
-  html += '<div class="chart-container"><div class="chart-title">近7天奶量 (ml)</div>';
+  html += '<div class="chart-container"><div class="chart-title">' + rangeLabel + '奶量 (ml)</div>';
   if (hasMilk) {
     html += '<canvas id="milkChart" width="320" height="180" style="width:100%;max-width:420px"></canvas>';
     html += '<div style="text-align:center;font-size:11px;color:var(--text-light);margin-top:4px">点击柱子查看当天详情</div>';
@@ -1569,7 +1632,7 @@ function renderStats() {
   var allSleepRecords = records.filter(function(r) { return r.type === 'sleep'; }).sort(function(a, b) { return b.timestamp - a.timestamp; });
   html += '<div class="chart-container"><div class="chart-title">睡眠记录</div>';
 
-  var sleepRange = getDateRange('7days');
+  var sleepRange = range;
   var sleepRecords = allSleepRecords.filter(function(r) {
     var ts = r.sleep_start || r.timestamp;
     return ts >= sleepRange.start && ts <= sleepRange.end;
@@ -1609,7 +1672,7 @@ function renderStats() {
   var allDiaperRecords = records.filter(function(r) { return r.type === 'diaper'; }).sort(function(a, b) { return b.timestamp - a.timestamp; });
   html += '<div class="chart-container"><div class="chart-title">尿布统计</div>';
 
-  var diaperRange = getDateRange('7days');
+  var diaperRange = range;
   var diaperRecords = allDiaperRecords.filter(function(r) {
     return r.timestamp >= diaperRange.start && r.timestamp <= diaperRange.end;
   });
@@ -1640,7 +1703,41 @@ function renderStats() {
   }
   html += '</div>';
 
-  // Formula cost chart — uses all milk records, not limited to last 7 days
+  // ---------- Formula cost: monthly trend (last 6 months, per can ¥369) ----------
+  var now = new Date();
+  var allCans = getFormulaCans();
+  var monthly = [];
+  for (var mi = 5; mi >= 0; mi--) {
+    var md = new Date(now.getFullYear(), now.getMonth() - mi, 1);
+    var my = md.getFullYear();
+    var mo = md.getMonth() + 1;
+    var prefix = my + '-' + mo.toString().padStart(2, '0');
+    var cnt = allCans.filter(function(c) { return c.date.indexOf(prefix) === 0; }).length;
+    monthly.push({ key: prefix, month: mo, monthLabel: mo + '月', count: cnt, cost: cnt * 369, isCurrent: (mo === now.getMonth() + 1 && my === now.getFullYear()) });
+  }
+  var hasAnyFormula = monthly.some(function(m) { return m.count > 0; });
+  window._formulaMonthlyData = monthly;
+
+  html += '<div class="chart-container"><div class="chart-title">奶粉费用月度趋势</div>';
+  html += '<div style="text-align:center;font-size:11px;color:var(--text-light);margin-bottom:6px">按开罐数 × ¥369/罐（680g）计算</div>';
+  if (hasAnyFormula) {
+    html += '<canvas id="formulaMonthlyChart" width="320" height="180" style="width:100%;max-width:420px"></canvas>';
+    html += '<div style="margin-top:10px">';
+    monthly.forEach(function(m) {
+      html += '<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px">' +
+        '<span>' + m.monthLabel + (m.isCurrent ? '（本月）' : '') + '</span>' +
+        '<span style="font-weight:600">' + m.count + '罐 · <span style="color:var(--pink)">¥' + m.cost + '</span></span></div>';
+    });
+    html += '</div>';
+    if (monthly[monthly.length - 1].count === 0) {
+      html += '<div style="text-align:center;font-size:11px;color:var(--text-light);margin-top:6px">本月暂未开罐，费用为 0</div>';
+    }
+  } else {
+    html += '<div class="stat-empty">暂无开罐记录</div>';
+  }
+  html += '</div>';
+
+  // ---------- Formula cost: daily cost within selected range ----------
   var formulaCostByDay = {};
   var formulaDateSet = {};
   records.forEach(function(r) {
@@ -1655,32 +1752,56 @@ function renderStats() {
   });
   var formulaDays = Object.keys(formulaDateSet).sort(function(a, b) { return a.localeCompare(b); });
 
-  // Filter by date range (fixed: last 7 days)
-  var formulaRange = getDateRange('7days');
   var formulaFilteredDays = formulaDays.filter(function(d) {
     var ts = new Date(d + 'T00:00:00').getTime();
-    return ts >= formulaRange.start && ts <= formulaRange.end;
+    return ts >= range.start && ts <= range.end;
   });
   var hasFormulaCost = formulaFilteredDays.length > 0;
 
-  var currentMonth = new Date().getMonth();
-  var monthTotal = 0;
-  formulaDays.forEach(function(d) {
-    var dParts = d.split('-');
-    if (parseInt(dParts[1], 10) - 1 === currentMonth) {
-      monthTotal += formulaCostByDay[d].total;
-    }
-  });
+  var formulaRangeTotal = 0;
+  formulaFilteredDays.forEach(function(d) { formulaRangeTotal += formulaCostByDay[d].total; });
 
-  html += '<div class="chart-container"><div class="chart-title">奶粉费用</div>';
+  html += '<div class="chart-container"><div class="chart-title">' + rangeLabel + '每日奶粉费用</div>';
   if (hasFormulaCost) {
     html += '<canvas id="formulaCostChart" width="320" height="180" style="width:100%;max-width:420px"></canvas>';
     html += '<div style="text-align:center;font-size:11px;color:var(--text-light);margin-top:4px">点击柱子查看当天详情</div>';
-    html += '<div style="text-align:center;padding:6px 0;font-size:15px;font-weight:700;color:var(--pink)">本月奶粉费用 ¥' + monthTotal.toFixed(2) + '</div>';
-    window._formulaCostChartData = { dates: formulaFilteredDays, data: formulaCostByDay, monthTotal: monthTotal };
+    html += '<div style="text-align:center;padding:6px 0;font-size:15px;font-weight:700;color:var(--pink)">' + rangeLabel + '奶粉费用 ¥' + formulaRangeTotal.toFixed(2) + '</div>';
+    window._formulaCostChartData = { dates: formulaFilteredDays, data: formulaCostByDay, monthTotal: formulaRangeTotal };
   } else {
-    html += '<div class="stat-empty">暂无奶粉数据</div>';
+    html += '<div class="stat-empty">区间内暂无奶粉数据</div>';
     window._formulaCostChartData = null;
+  }
+  html += '</div>';
+
+  // ---------- Feeding pattern (follows selected range) ----------
+  var milkInRange = records.filter(function(r) { return r.type === 'milk' && r.timestamp >= range.start && r.timestamp <= range.end; }).sort(function(a, b) { return a.timestamp - b.timestamp; });
+  var totalMilk = 0;
+  milkInRange.forEach(function(r) { totalMilk += (r.amount || 0); });
+  var feedCount = milkInRange.length;
+  var hasFeed = feedCount > 0;
+  var rangeDayCount = Math.max(1, Math.round((range.end - range.start) / 86400000) + 1);
+  var avgDaily = hasFeed ? totalMilk / rangeDayCount : 0;
+  var avgDailyCount = hasFeed ? feedCount / rangeDayCount : 0;
+  var avgPerFeed = hasFeed ? totalMilk / feedCount : 0;
+  var avgInterval = null;
+  if (feedCount >= 2) {
+    var totalGap = 0;
+    for (var gi = 1; gi < feedCount; gi++) {
+      totalGap += milkInRange[gi].timestamp - milkInRange[gi - 1].timestamp;
+    }
+    avgInterval = totalGap / (feedCount - 1) / 3600000;
+  }
+
+  html += '<div class="chart-container"><div class="chart-title">喂养规律</div>';
+  if (hasFeed) {
+    html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:4px 0">';
+    html += '<div style="background:var(--bg);border-radius:12px;padding:12px;text-align:center"><div style="font-size:22px;font-weight:700;color:var(--pink)">' + Math.round(avgDaily) + ' ml</div><div style="font-size:11px;color:var(--text-light)">日均奶量</div></div>';
+    html += '<div style="background:var(--bg);border-radius:12px;padding:12px;text-align:center"><div style="font-size:22px;font-weight:700;color:var(--pink)">' + avgDailyCount.toFixed(1) + ' 次/天</div><div style="font-size:11px;color:var(--text-light)">日均喂养次数</div></div>';
+    html += '<div style="background:var(--bg);border-radius:12px;padding:12px;text-align:center"><div style="font-size:22px;font-weight:700;color:var(--pink)">' + (avgInterval !== null ? avgInterval.toFixed(1) : '--') + ' h</div><div style="font-size:11px;color:var(--text-light)">平均喂养间隔</div></div>';
+    html += '<div style="background:var(--bg);border-radius:12px;padding:12px;text-align:center"><div style="font-size:22px;font-weight:700;color:var(--pink)">' + Math.round(avgPerFeed) + ' ml</div><div style="font-size:11px;color:var(--text-light)">单次平均奶量</div></div>';
+    html += '</div>';
+  } else {
+    html += '<div class="stat-empty">' + rangeLabel + '暂无奶量记录，无法统计喂养规律</div>';
   }
   html += '</div>';
 
@@ -1714,6 +1835,7 @@ function renderStats() {
   if (hasMilk) drawMilkChart(days, milkValues, maxMilk);
   if (window._diaperChartData) drawDiaperChart(window._diaperChartData);
   if (window._formulaCostChartData) drawFormulaCostChart(window._formulaCostChartData);
+  if (window._formulaMonthlyData) drawFormulaMonthlyChart();
   if (window._sleepChartData) drawSleepChart(window._sleepChartData);
   if (heightData.length >= 2) drawSingleMetricChart('heightChart', heightData, 'height', '#FF6B8A', '身高(cm)');
   if (weightData.length >= 2) drawSingleMetricChart('weightChart', weightData, 'weight', '#5BA4CF', '体重(斤)');
@@ -1735,8 +1857,8 @@ function drawMilkChart(days, values, max) {
   var pad = { top: 16, right: 12, bottom: 28, left: 40 };
   var cw = w - pad.left - pad.right;
   var ch = h - pad.top - pad.bottom;
-  var barW = Math.max(14, Math.min(32, cw / days.length * 0.6));
-  var gap = (cw - barW * days.length) / (days.length + 1);
+  var barW = Math.max(2, Math.min(32, cw / days.length * 0.6));
+  var gap = Math.max(1, (cw - barW * days.length) / (days.length + 1));
 
   ctx.clearRect(0, 0, w, h);
 
@@ -1787,8 +1909,11 @@ function drawMilkChart(days, values, max) {
     ctx.fillStyle = '#888';
     ctx.font = '10px sans-serif';
     ctx.textAlign = 'center';
-    var dateLabel = (parseInt(d.slice(8, 10), 10)) + '日';
-    ctx.fillText(dateLabel, x + barW / 2, pad.top + ch + 18);
+    var showLabel = days.length <= 10 || (i % Math.ceil(days.length / 8) === 0) || i === days.length - 1;
+    if (showLabel) {
+      var dateLabel = (parseInt(d.slice(8, 10), 10)) + '日';
+      ctx.fillText(dateLabel, x + barW / 2, pad.top + ch + 18);
+    }
 
     // Store position
     window._milkBarPositions.push({ date: d, x: x, w: barW });
@@ -1883,8 +2008,8 @@ function drawDiaperChart(chartData) {
 
   var dates = chartData.dates;
   var data = chartData.data;
-  var barW = Math.max(14, Math.min(32, cw / dates.length * 0.6));
-  var gap = (cw - barW * dates.length) / (dates.length + 1);
+  var barW = Math.max(2, Math.min(32, cw / dates.length * 0.6));
+  var gap = Math.max(1, (cw - barW * dates.length) / (dates.length + 1));
 
   // Find max total for scale
   var maxTotal = 0;
@@ -1938,8 +2063,11 @@ function drawDiaperChart(chartData) {
     ctx.fillStyle = '#888';
     ctx.font = '10px sans-serif';
     ctx.textAlign = 'center';
-    var dateLabel = (parseInt(d.slice(8, 10), 10)) + '日';
-    ctx.fillText(dateLabel, x + barW / 2, pad.top + ch + 18);
+    var showLabel = days.length <= 10 || (i % Math.ceil(days.length / 8) === 0) || i === days.length - 1;
+    if (showLabel) {
+      var dateLabel = (parseInt(d.slice(8, 10), 10)) + '日';
+      ctx.fillText(dateLabel, x + barW / 2, pad.top + ch + 18);
+    }
 
     window._diaperBarPositions.push({ date: d, x: x, w: barW });
   });
@@ -2027,8 +2155,8 @@ function drawSleepChart(chartData) {
 
   var dates = chartData.dates;
   var data = chartData.data;
-  var barW = Math.max(14, Math.min(32, cw / dates.length * 0.6));
-  var gap = (cw - barW * dates.length) / (dates.length + 1);
+  var barW = Math.max(2, Math.min(32, cw / dates.length * 0.6));
+  var gap = Math.max(1, (cw - barW * dates.length) / (dates.length + 1));
 
   // Compute max total hours per day for scale (round up to nearest 0.5h)
   var maxTotalH = 0;
@@ -2114,9 +2242,12 @@ function drawSleepChart(chartData) {
     ctx.fillStyle = '#888';
     ctx.font = '10px sans-serif';
     ctx.textAlign = 'center';
-    var parts = d.split('-');
-    var label = parseInt(parts[1], 10) + '/' + parseInt(parts[2], 10);
-    ctx.fillText(label, x + barW / 2, pad.top + ch + 16);
+    var showLabel = dates.length <= 10 || (i % Math.ceil(dates.length / 8) === 0) || i === dates.length - 1;
+    if (showLabel) {
+      var parts = d.split('-');
+      var label = parseInt(parts[1], 10) + '/' + parseInt(parts[2], 10);
+      ctx.fillText(label, x + barW / 2, pad.top + ch + 16);
+    }
 
     window._sleepBarPositions.push({ date: d, x: x, w: barW });
   });
@@ -2646,6 +2777,81 @@ function updateTimer() {
 }
 
 // ------- Service Worker -------
+function drawFormulaMonthlyChart() {
+  var canvas = document.getElementById('formulaMonthlyChart');
+  if (!canvas) return;
+  var ctx = canvas.getContext('2d');
+  var dpr = window.devicePixelRatio || 1;
+  var rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = 180 * dpr;
+  ctx.scale(dpr, dpr);
+  canvas.style.height = '180px';
+
+  var w = rect.width;
+  var h = 180;
+  var pad = { top: 16, right: 12, bottom: 28, left: 48 };
+  var cw = w - pad.left - pad.right;
+  var ch = h - pad.top - pad.bottom;
+
+  var data = window._formulaMonthlyData || [];
+  if (data.length === 0) return;
+  var maxCost = 1;
+  data.forEach(function(m) { if (m.cost > maxCost) maxCost = m.cost; });
+
+  var barW = Math.max(14, Math.min(40, cw / data.length * 0.55));
+  var gap = (cw - barW * data.length) / (data.length + 1);
+
+  ctx.clearRect(0, 0, w, h);
+
+  ctx.strokeStyle = '#F0E8E8';
+  ctx.lineWidth = 1;
+  var gridLines = 4;
+  for (var i = 0; i <= gridLines; i++) {
+    var y = pad.top + (ch / gridLines) * i;
+    ctx.beginPath();
+    ctx.moveTo(pad.left, y);
+    ctx.lineTo(w - pad.right, y);
+    ctx.stroke();
+    ctx.fillStyle = '#888';
+    ctx.font = '11px sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText('¥' + Math.round(maxCost / gridLines * (gridLines - i)), pad.left - 6, y + 4);
+  }
+
+  data.forEach(function(m, idx) {
+    var val = m.cost;
+    var barH = val / maxCost * ch;
+    var x = pad.left + gap + idx * (barW + gap);
+    var y = pad.top + ch - barH;
+
+    var gradient = ctx.createLinearGradient(x, y, x, pad.top + ch);
+    if (m.isCurrent) {
+      gradient.addColorStop(0, '#FF6B8A');
+      gradient.addColorStop(1, '#FF9AA2');
+    } else {
+      gradient.addColorStop(0, '#FF9AA2');
+      gradient.addColorStop(1, '#FFB7B2');
+    }
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.roundRect(x, y, barW, barH, [4, 4, 0, 0]);
+    ctx.fill();
+
+    if (val > 0) {
+      ctx.fillStyle = '#4A4A4A';
+      ctx.font = '10px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('¥' + Math.round(val), x + barW / 2, y - 4);
+    }
+
+    ctx.fillStyle = '#888';
+    ctx.font = '10px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(m.monthLabel, x + barW / 2, pad.top + ch + 18);
+  });
+}
+
 function drawFormulaCostChart(chartData) {
   var canvas = document.getElementById('formulaCostChart');
   if (!canvas) return;
@@ -2669,8 +2875,8 @@ function drawFormulaCostChart(chartData) {
   dates.forEach(function(d) { if (data[d].total > maxCost) maxCost = data[d].total; });
   if (maxCost === 0) maxCost = 1;
 
-  var barW = Math.max(14, Math.min(32, cw / dates.length * 0.6));
-  var gap = (cw - barW * dates.length) / (dates.length + 1);
+  var barW = Math.max(2, Math.min(32, cw / dates.length * 0.6));
+  var gap = Math.max(1, (cw - barW * dates.length) / (dates.length + 1));
 
   ctx.clearRect(0, 0, w, h);
 
@@ -2719,9 +2925,12 @@ function drawFormulaCostChart(chartData) {
     ctx.fillStyle = '#888';
     ctx.font = '10px sans-serif';
     ctx.textAlign = 'center';
-    var dateParts = d.split('-');
-    var dateLabel = (parseInt(dateParts[1], 10)) + '/' + (parseInt(dateParts[2], 10));
-    ctx.fillText(dateLabel, x + barW / 2, pad.top + ch + 18);
+    var showLabel = dates.length <= 10 || (i % Math.ceil(dates.length / 8) === 0) || i === dates.length - 1;
+    if (showLabel) {
+      var dateParts = d.split('-');
+      var dateLabel = (parseInt(dateParts[1], 10)) + '/' + (parseInt(dateParts[2], 10));
+      ctx.fillText(dateLabel, x + barW / 2, pad.top + ch + 18);
+    }
 
     window._formulaBarPositions.push({ date: d, x: x, w: barW });
   });
