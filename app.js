@@ -1,5 +1,5 @@
 /* ============================================
-   宝宝喂养记录 PWA - 应用逻辑 v3.41 (Supabase)
+   宝宝喂养记录 PWA - 应用逻辑 v3.42 (Supabase)
    ============================================ */
 
 const FORMULA_COST_PER_30ML = 2.28; // 30ml = 4.2g, 680g = 369元 → 每30ml费用
@@ -498,14 +498,13 @@ function renderDashboard() {
   var sleepStr = sleepCount > 0 ? Math.floor(totalSleepMin / 60) + 'h' + (totalSleepMin % 60) + 'm' : '--';
 
   var foodTotal = mealCount + snackCount;
-  var monthOpenCount = countMonthFormulaCans();
+
   document.getElementById('dashSummary').innerHTML =
     '<div class="dash-milk-hero" style="cursor:pointer" onclick="showTodayDetail(\'milk\')"><div class="hero-value">' + totalMilk + '<span class="unit">ml</span></div><div class="label">今日奶量</div></div>' +
-    '<div class="dash-sub-row" style="grid-template-columns:repeat(4,1fr)">' +
+    '<div class="dash-sub-row" style="grid-template-columns:repeat(3,1fr)">' +
     '<div class="dash-item" style="cursor:pointer" onclick="showTodayDetail(\'meal\')"><div class="value">' + foodTotal + '<span class="unit">次</span></div><div class="label">进食</div></div>' +
     '<div class="dash-item" style="cursor:pointer" onclick="showTodayDetail(\'sleep\')"><div class="value">' + sleepStr + '</div><div class="label">睡眠</div></div>' +
     '<div class="dash-item" style="cursor:pointer" onclick="showTodayDetail(\'diaper\')"><div class="value">' + diaperCount + '<span class="unit">次</span></div><div class="label">尿布</div></div>' +
-    '<div class="dash-item" style="cursor:pointer" onclick="showMonthFormulaDetail()"><div class="value">' + monthOpenCount + '<span class="unit">罐</span></div><div class="label">本月开罐</div></div>' +
     '</div>';
 
   // Timer: check for active sleep first
@@ -2144,7 +2143,7 @@ function drawDiaperChart(chartData) {
     ctx.fillStyle = getChartTheme().axis;
     ctx.font = '10px sans-serif';
     ctx.textAlign = 'center';
-    var showLabel = days.length <= 10 || (i % Math.ceil(days.length / 8) === 0) || i === days.length - 1;
+    var showLabel = dates.length <= 10 || (i % Math.ceil(dates.length / 8) === 0) || i === dates.length - 1;
     if (showLabel) {
       var dateLabel = (parseInt(d.slice(8, 10), 10)) + '日';
       ctx.fillText(dateLabel, x + barW / 2, pad.top + ch + 18);
@@ -2942,7 +2941,7 @@ async function clearAllData() {
 function exportBackup() {
   var data = {
     app: 'baby-feeding',
-    version: '3.41',
+    version: '3.42',
     exportedAt: new Date().toISOString(),
     records: getRecords(),
     formulaCans: getFormulaCans()
