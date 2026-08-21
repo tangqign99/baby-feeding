@@ -526,6 +526,13 @@ body {
       </div>
     </div>
     <div class="card">
+      <div class="card-title">奶粉开启</div>
+      <div style="padding:4px 0 10px">
+        <button onclick="addFormulaCan()" style="width:100%;padding:12px;background:var(--pink);color:#fff;border:none;border-radius:var(--radius-sm);font-size:14px;font-weight:500;cursor:pointer">📦 记录开启一罐新奶粉</button>
+      </div>
+      <div id="formulaCansList"></div>
+    </div>
+    <div class="card">
       <div class="card-title">奶粉费用</div>
       <div class="setting-item">
         <div class="label">每30ml奶粉费用</div>
@@ -582,11 +589,11 @@ body {
 
 <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-  <script src="./app.js?v=3.37"></script>
+  <script src="./app.js?v=3.38"></script>
   <script>
     // Service Worker 注册
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('./sw.js?v=3.17').then(function(reg) {
+      navigator.serviceWorker.register('./sw.js?v=3.38').then(function(reg) {
         console.log('SW registered:', reg.scope);
       }).catch(function(err) {
         console.log('SW failed:', err);

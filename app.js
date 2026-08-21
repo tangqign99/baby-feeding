@@ -1,5 +1,5 @@
 /* ============================================
-   宝宝喂养记录 PWA - 应用逻辑 v3.37 (Supabase)
+   宝宝喂养记录 PWA - 应用逻辑 v3.38 (Supabase)
    ============================================ */
 
 const FORMULA_COST_PER_30ML = 2.28; // 30ml = 4.2g, 680g = 369元 → 每30ml费用
@@ -278,6 +278,7 @@ function getTypeIcon(type) {
     case 'height': return '📏';
     case 'weight': return '⚖️';
     case 'hw': return '📏';
+    case 'custom': return '📝';
     default: return '📌';
   }
 }
@@ -293,6 +294,7 @@ function getTypeName(type) {
     case 'height': return '身高';
     case 'weight': return '体重';
     case 'hw': return '身高体重';
+    case 'custom': return '其他';
     default: return '其他';
   }
 }
@@ -404,12 +406,15 @@ function renderDashboard() {
   });
   var sleepStr = sleepCount > 0 ? Math.floor(totalSleepMin / 60) + 'h' + (totalSleepMin % 60) + 'm' : '--';
 
+  var foodTotal = mealCount + snackCount;
+  var monthOpenCount = countMonthFormulaCans();
   document.getElementById('dashSummary').innerHTML =
     '<div class="dash-milk-hero" style="cursor:pointer" onclick="showTodayDetail(\'milk\')"><div class="hero-value">' + totalMilk + '<span class="unit">ml</span></div><div class="label">今日奶量</div></div>' +
-    '<div class="dash-sub-row" style="grid-template-columns:repeat(3,1fr)">' +
-    '<div class="dash-item" style="cursor:pointer" onclick="showTodayDetail(\'meal\')"><div class="value">' + mealCount + '<span class="unit">次</span></div><div class="label">吃饭</div></div>' +
+    '<div class="dash-sub-row" style="grid-template-columns:repeat(4,1fr)">' +
+    '<div class="dash-item" style="cursor:pointer" onclick="showTodayDetail(\'meal\')"><div class="value">' + foodTotal + '<span class="unit">次</span></div><div class="label">进食</div></div>' +
     '<div class="dash-item" style="cursor:pointer" onclick="showTodayDetail(\'sleep\')"><div class="value">' + sleepStr + '</div><div class="label">睡眠</div></div>' +
     '<div class="dash-item" style="cursor:pointer" onclick="showTodayDetail(\'diaper\')"><div class="value">' + diaperCount + '<span class="unit">次</span></div><div class="label">尿布</div></div>' +
+    '<div class="dash-item" style="cursor:pointer" onclick="showMonthFormulaDetail()"><div class="value">' + monthOpenCount + '<span class="unit">罐</span></div><div class="label">本月开罐</div></div>' +
     '</div>';
 
   // Timer: check for active sleep first
@@ -528,6 +533,7 @@ function buildRecordDesc(r) {
   if (r.type === 'height') return r.height + ' cm';
   if (r.type === 'weight') return r.weight + ' 斤';
   if (r.type === 'hw') return (r.height ? r.height + 'cm' : '') + (r.weight ? ' ' + r.weight + '斤' : '');
+  if (r.type === 'custom') return r.subtype || '其他';
   return '';
 }
 
@@ -537,7 +543,7 @@ function showTodayDetail(type) {
 
   var today = formatDate(Date.now());
   var records = getRecords();
-  var typeNames = { milk: '奶量', meal: '吃饭', snack: '辅食', sleep: '睡眠', diaper: '尿布' };
+  var typeNames = { milk: '奶量', meal: '吃饭', snack: '辅食', sleep: '睡眠', diaper: '尿布', custom: '其他' };
   var typeName = typeNames[type] || getTypeName(type);
 
   var dayRecords;
@@ -739,7 +745,8 @@ function renderEntry() {
   ];
   var tabsRow3 = [
     { id: 'height', label: '📏 身高' },
-    { id: 'weight', label: '⚖️ 体重' }
+    { id: 'weight', label: '⚖️ 体重' },
+    { id: 'custom', label: '📝 其他' }
   ];
   var allTabs = tabsRow1.concat(tabsRow2).concat(tabsRow3);
 
@@ -918,6 +925,19 @@ function renderEntryContent() {
         datetimeRowHtml() +
         '<button class="btn-primary" onclick="recordDiaper()">记录尿布</button>';
       buildPresetGrid(['小便', '大便'], '');
+      break;
+
+    case 'custom':
+      container.innerHTML =
+        '<div style="font-size:13px;color:var(--text-light);margin-bottom:6px;">记录内容</div>' +
+        '<div class="entry-row">' +
+        '<input type="text" id="customContent" placeholder="如：吃药、洗澡、理发等" maxlength="50">' +
+        '</div>' +
+        '<div class="entry-row">' +
+        '<input type="text" id="customNote" placeholder="备注（可选）" maxlength="50">' +
+        '</div>' +
+        datetimeRowHtml() +
+        '<button class="btn-primary" onclick="recordCustom()">记录其他</button>';
       break;
 
     case 'poop':
@@ -1294,6 +1314,36 @@ async function recordDiaper() {
   toast('记录成功：尿布 · ' + diaperType + ' 🧷', 'success');
   entryTab = 'diaper';
   selectedPreset = '';
+  renderEntry();
+  navigateTo('dashboard');
+}
+
+// ------- Custom -------
+async function recordCustom() {
+  var contentEl = document.getElementById('customContent');
+  var content = contentEl ? contentEl.value.trim() : '';
+  if (!content) { toast('请输入记录内容', 'warning'); return; }
+
+  var noteEl = document.getElementById('customNote');
+  var note = noteEl ? noteEl.value.trim() : '';
+
+  var record = {
+    type: 'custom',
+    subtype: content,
+    timestamp: getEntryTimestamp(),
+    note: note
+  };
+
+  try {
+    await saveRecord(record);
+    toast('记录成功：' + content + ' 📝', 'success');
+  } catch (e) {
+    toast('保存失败：' + e.message, 'warning');
+    return;
+  }
+  entryTab = 'custom';
+  selectedPreset = '';
+  selectedPortion = '';
   renderEntry();
   navigateTo('dashboard');
 }
@@ -2325,6 +2375,7 @@ function renderSettings() {
   document.getElementById('notifToggle').checked = s.notifEnabled;
   document.getElementById('intervalSelect').value = s.interval;
   document.getElementById('notifStatus').textContent = s.notifEnabled ? '已开启 · ' + (s.interval / 60) + '小时提醒' : '未开启';
+  renderFormulaCans();
 }
 
 function toggleNotification() {
@@ -2453,6 +2504,7 @@ async function clearAllData() {
         .neq('id', '00000000-0000-0000-0000-000000000000');
       if (error) throw error;
       cachedRecords = [];
+      localStorage.removeItem(FORMULA_CANS_KEY);
       toast('所有数据已清空', 'success');
     } catch (e) {
       toast('清空失败: ' + e.message, 'warning');
@@ -2712,6 +2764,101 @@ function registerSW() {
   }
 }
 
+// ------- Formula Can Opening (local only, not synced to Supabase) -------
+const FORMULA_CANS_KEY = 'formulaCans';
+
+function getFormulaCans() {
+  try {
+    var raw = localStorage.getItem(FORMULA_CANS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) { return []; }
+}
+
+function saveFormulaCans(cans) {
+  localStorage.setItem(FORMULA_CANS_KEY, JSON.stringify(cans));
+}
+
+function addFormulaCan() {
+  var cans = getFormulaCans();
+  var rec = { date: formatDate(Date.now()), id: Date.now().toString(36) + Math.random().toString(36).slice(2, 7) };
+  cans.unshift(rec);
+  saveFormulaCans(cans);
+  renderFormulaCans();
+  if (currentPage === 'dashboard') renderDashboard();
+  toast('已记录开启一罐新奶粉', 'success');
+}
+
+function deleteFormulaCan(id) {
+  var cans = getFormulaCans().filter(function(c) { return c.id !== id; });
+  saveFormulaCans(cans);
+  renderFormulaCans();
+  if (currentPage === 'dashboard') renderDashboard();
+}
+
+function renderFormulaCans() {
+  var el = document.getElementById('formulaCansList');
+  if (!el) return;
+  var cans = getFormulaCans();
+  if (cans.length === 0) {
+    el.innerHTML = '<div style="text-align:center;padding:12px;color:var(--text-light);font-size:13px">暂无开罐记录</div>';
+    return;
+  }
+  var html = '';
+  cans.forEach(function(c) {
+    html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">' +
+      '<span style="font-size:14px">📦 ' + c.date + '</span>' +
+      '<button onclick="deleteFormulaCan(\'' + c.id + '\')" style="border:none;background:none;color:#FF6B8A;font-size:16px;cursor:pointer;padding:4px 8px" title="删除">&times;</button>' +
+      '</div>';
+  });
+  el.innerHTML = html;
+}
+
+function countMonthFormulaCans() {
+  var now = new Date();
+  var monthPrefix = now.getFullYear() + '-' + (now.getMonth() + 1).toString().padStart(2, '0');
+  return getFormulaCans().filter(function(c) { return c.date.indexOf(monthPrefix) === 0; }).length;
+}
+
+function showMonthFormulaDetail() {
+  var existing = document.getElementById('monthFormulaPopup');
+  if (existing) existing.remove();
+
+  var now = new Date();
+  var monthLabel = now.getFullYear() + '年' + (now.getMonth() + 1) + '月';
+  var monthPrefix = now.getFullYear() + '-' + (now.getMonth() + 1).toString().padStart(2, '0');
+  var cans = getFormulaCans().filter(function(c) { return c.date.indexOf(monthPrefix) === 0; });
+
+  var html = '<div class="modal-overlay show" id="monthFormulaPopup" onclick="closeMonthFormulaDetail(event)">' +
+    '<div class="modal-box" style="max-height:70vh;overflow-y:auto" onclick="event.stopPropagation()">' +
+    '<h3 style="margin-bottom:12px">' + monthLabel + '开罐明细</h3>';
+
+  if (cans.length === 0) {
+    html += '<div style="text-align:center;padding:20px;color:var(--text-light)">本月暂无开罐记录</div>';
+  } else {
+    html += '<table style="width:100%;font-size:13px;border-collapse:collapse">' +
+      '<thead><tr style="border-bottom:2px solid #F0E8E8;text-align:left;color:var(--text-light);font-size:11px"><th style="padding:8px 4px">日期</th><th style="padding:8px 4px">操作</th></tr></thead><tbody>';
+    cans.forEach(function(c) {
+      html += '<tr style="border-bottom:1px solid var(--border)">' +
+        '<td style="padding:8px 4px">📦 ' + c.date + '</td>' +
+        '<td style="padding:8px 4px"><button onclick="deleteFormulaCan(\'' + c.id + '\')" style="border:none;background:none;color:#FF6B8A;font-size:14px;cursor:pointer" title="删除">&times;</button></td>' +
+        '</tr>';
+    });
+    html += '</tbody></table>';
+  }
+
+  html += '<div class="btn-row" style="margin-top:16px">' +
+    '<button class="btn-confirm" onclick="document.getElementById(\'monthFormulaPopup\').remove()" style="flex:1;padding:10px;border-radius:20px;font-size:14px;border:none;background:var(--pink);color:#fff;cursor:pointer">关闭</button>' +
+    '</div></div></div>';
+
+  document.body.insertAdjacentHTML('beforeend', html);
+}
+
+function closeMonthFormulaDetail(e) {
+  if (e && e.target !== document.getElementById('monthFormulaPopup')) return;
+  var el = document.getElementById('monthFormulaPopup');
+  if (el) el.remove();
+}
+
 // ------- Query Day Records -------
 function queryDayRecords() {
   var dateInput = document.getElementById('queryDate');
@@ -2726,7 +2873,7 @@ function queryDayRecords() {
   });
 
   // Build summary
-  var milkTotal = 0, mealCount = 0, snackCount = 0, diaperCount = 0;
+  var milkTotal = 0, mealCount = 0, snackCount = 0, diaperCount = 0, customCount = 0;
   var sleepTotalMs = 0;
 
   matched.forEach(function(r) {
@@ -2734,6 +2881,7 @@ function queryDayRecords() {
     else if (r.type === 'meal') mealCount++;
     else if (r.type === 'snack') snackCount++;
     else if (r.type === 'diaper') diaperCount++;
+    else if (r.type === 'custom') customCount++;
     else if (r.type === 'sleep') {
       if (r.sleep_start && r.sleep_end) sleepTotalMs += (r.sleep_end - r.sleep_start);
     }
@@ -2773,6 +2921,10 @@ function queryDayRecords() {
     html += '<div class="dash-item" style="cursor:pointer" onclick="showQueryTypeDetail(\'' + selectedDate + '\',\'diaper\')">' +
       '<div class="value" style="font-size:22px">' + diaperCount + '<span class="unit">次</span></div>' +
       '<div class="label">🧷 尿布</div></div>';
+
+    html += '<div class="dash-item" style="cursor:pointer" onclick="showQueryTypeDetail(\'' + selectedDate + '\',\'custom\')">' +
+      '<div class="value" style="font-size:22px">' + customCount + '<span class="unit">条</span></div>' +
+      '<div class="label">📝 其他</div></div>';
 
     html += '</div>';
     html += '<div style="text-align:center;font-size:11px;color:var(--text-light);margin-top:8px">点击卡片查看详情</div>';
