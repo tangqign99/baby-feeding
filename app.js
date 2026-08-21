@@ -1,5 +1,5 @@
 /* ============================================
-   宝宝喂养记录 PWA - 应用逻辑 v3.42 (Supabase)
+   宝宝喂养记录 PWA - 应用逻辑 v3.43 (Supabase)
    ============================================ */
 
 const FORMULA_COST_PER_30ML = 2.28; // 30ml = 4.2g, 680g = 369元 → 每30ml费用
@@ -43,7 +43,7 @@ var WHO_GROWTH = {
 const THEME_KEY = 'baby_feeding_theme';
 
 function getThemePreference() {
-  try { return localStorage.getItem(THEME_KEY) || 'system'; } catch (e) { return 'system'; }
+  try { return localStorage.getItem(THEME_KEY) || 'light'; } catch (e) { return 'light'; }
 }
 
 function getEffectiveTheme() {
@@ -2941,7 +2941,7 @@ async function clearAllData() {
 function exportBackup() {
   var data = {
     app: 'baby-feeding',
-    version: '3.42',
+    version: '3.43',
     exportedAt: new Date().toISOString(),
     records: getRecords(),
     formulaCans: getFormulaCans()
@@ -3679,7 +3679,7 @@ function showEditRecord(id) {
   var records = getRecords();
   var r = null;
   for (var i = 0; i < records.length; i++) {
-    if (records[i].id === id) { r = records[i]; break; }
+    if (String(records[i].id) === String(id)) { r = records[i]; break; }
   }
   if (!r) { toast('未找到该记录', 'warning'); return; }
 
@@ -3752,7 +3752,7 @@ async function saveEditRecord(id) {
   var records = getRecords();
   var idx = -1;
   for (var i = 0; i < records.length; i++) {
-    if (records[i].id === id) { idx = i; break; }
+    if (String(records[i].id) === String(id)) { idx = i; break; }
   }
   if (idx < 0) { toast('未找到该记录', 'warning'); return; }
 

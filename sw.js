@@ -1,4 +1,4 @@
-﻿const CACHE_NAME = 'baby-feeding-v3.42';
+﻿const CACHE_NAME = 'baby-feeding-v3.43';
 const ASSETS = [
   './',
   './index.html',
