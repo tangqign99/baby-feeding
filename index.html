@@ -26,6 +26,43 @@
   --radius-sm: 10px;
   --nav-height: 64px;
   --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --type-milk: #FFF0F5;
+  --type-meal: #FFF8F0;
+  --type-snack: #FFFDEB;
+  --type-sleep: #F0F0FF;
+  --type-poop: #F5E6CC;
+  --type-diaper: #F0F8FF;
+  --type-height: #F0F4FF;
+  --type-weight: #F0FFF4;
+  --type-default: #F5F5F5;
+  --pink-soft: #FFF0F0;
+  --bg-soft: #F9F9F9;
+  --slider-bg: #DDDDDD;
+}
+:root[data-theme="dark"] {
+  --pink: #FF8A95;
+  --pink-light: #B95A66;
+  --peach: #7A5B4A;
+  --mint: #3E6B5B;
+  --blue-light: #4A5578;
+  --bg: #1B1A21;
+  --card: #26242C;
+  --text: #E9EAED;
+  --text-light: #9AA0A6;
+  --border: #3A3841;
+  --shadow: 0 2px 12px rgba(0,0,0,0.45);
+  --type-milk: rgba(255,138,149,0.16);
+  --type-meal: rgba(255,167,102,0.14);
+  --type-snack: rgba(255,214,102,0.12);
+  --type-sleep: rgba(123,104,238,0.16);
+  --type-poop: rgba(214,175,120,0.14);
+  --type-diaper: rgba(91,164,207,0.14);
+  --type-height: rgba(91,164,207,0.12);
+  --type-weight: rgba(102,214,167,0.12);
+  --type-default: rgba(255,255,255,0.08);
+  --pink-soft: rgba(255,138,149,0.14);
+  --bg-soft: #2E2C36;
+  --slider-bg: #4A4852;
 }
 * { margin:0; padding:0; box-sizing:border-box; }
 body {
@@ -56,7 +93,7 @@ body {
 }
 .header-left { display:flex; flex-direction:column; }
 .header h1 { font-size:22px; font-weight:700; color:var(--pink); }
-.baby-age { font-size:13px; color:#999; margin-top:2px; }
+.baby-age { font-size:13px; color:var(--text-light); margin-top:2px; }
 .header .baby-emoji { width:42px; height:42px; border-radius:50%; object-fit:cover; cursor:default; }
 /* Toast */
 .toast-container {
@@ -151,19 +188,19 @@ body {
 .rc-delete-btn {
   position: absolute; top: 8px; right: 10px;
   width: 26px; height: 26px; border-radius: 50%; border: none;
-  background: transparent; color: #ccc; font-size: 16px; cursor: pointer;
+  background: transparent; color: var(--text-light); font-size: 16px; cursor: pointer;
   display: flex; align-items: center; justify-content: center;
   transition: all 0.15s; line-height: 1;
 }
-.rc-delete-btn:hover, .rc-delete-btn:active { color: #e74c3c; background: #FFF0F0; }
+.rc-delete-btn:hover, .rc-delete-btn:active { color: #e74c3c; background:var(--pink-soft); }
 .rc-edit-btn {
   position: absolute; top: 8px; right: 40px;
   width: 26px; height: 26px; border-radius: 50%; border: none;
-  background: transparent; color: #ccc; font-size: 14px; cursor: pointer;
+  background: transparent; color: var(--text-light); font-size: 14px; cursor: pointer;
   display: flex; align-items: center; justify-content: center;
   transition: all 0.15s; line-height: 1;
 }
-.rc-edit-btn:hover, .rc-edit-btn:active { color: var(--pink); background: #FFF0F0; }
+.rc-edit-btn:hover, .rc-edit-btn:active { color: var(--pink); background:var(--pink-soft); }
 /* Note toggle in record cards */
 .rc-note-toggle {
   font-size: 11px; color: var(--pink); cursor: pointer;
@@ -171,10 +208,10 @@ body {
   user-select: none; padding: 2px 6px; border-radius: 8px;
   transition: background 0.15s;
 }
-.rc-note-toggle:hover { background: #FFF0F0; }
+.rc-note-toggle:hover { background:var(--pink-soft); }
 .rc-note-content {
   font-size: 12px; color: var(--text-light); margin-top: 4px;
-  padding: 6px 10px; background: #F9F9F9; border-radius: 8px;
+  padding: 6px 10px; background:var(--bg-soft); border-radius: 8px;
   line-height: 1.4;
 }
 /* Note toggle in timeline */
@@ -184,27 +221,27 @@ body {
   user-select: none; padding: 1px 5px; border-radius: 6px;
   transition: background 0.15s;
 }
-.tl-note-toggle:hover { background: #FFF0F0; }
+.tl-note-toggle:hover { background:var(--pink-soft); }
 .tl-note-content {
   font-size: 11px; color: var(--text-light); margin-top: 3px;
-  padding: 4px 8px; background: #F9F9F9; border-radius: 6px;
+  padding: 4px 8px; background:var(--bg-soft); border-radius: 6px;
   line-height: 1.4;
 }
 /* Timeline delete */
 .tl-delete-btn {
   width: 28px; height: 28px; border-radius: 50%; border: none;
-  background: transparent; color: #ccc; font-size: 15px; cursor: pointer;
+  background: transparent; color: var(--text-light); font-size: 15px; cursor: pointer;
   display: flex; align-items: center; justify-content: center;
   transition: all 0.15s; flex-shrink: 0;
 }
-.tl-delete-btn:active { color: #e74c3c; background: #FFF0F0; }
+.tl-delete-btn:active { color: #e74c3c; background:var(--pink-soft); }
 .tl-edit-btn {
   width: 28px; height: 28px; border-radius: 50%; border: none;
-  background: transparent; color: #ccc; font-size: 13px; cursor: pointer;
+  background: transparent; color: var(--text-light); font-size: 13px; cursor: pointer;
   display: inline-flex; align-items: center; justify-content: center;
   transition: all 0.15s; flex-shrink: 0; line-height: 1;
 }
-.tl-edit-btn:active, .tl-edit-btn:hover { color: var(--pink); background: #FFF0F0; }
+.tl-edit-btn:active, .tl-edit-btn:hover { color: var(--pink); background:var(--pink-soft); }
 /* Datetime input */
 .datetime-row { margin-bottom: 4px; }
 .datetime-row .dt-date {
@@ -236,7 +273,7 @@ body {
 .tab-bar-row2 { margin-top:-6px; }
 .tab-btn {
   flex:1; padding:10px 6px; border:none; border-radius:20px; font-size:13px;
-  background:#f5f5f5; color:var(--text); cursor:pointer; transition:all 0.2s;
+  background:var(--bg-soft); color:var(--text); cursor:pointer; transition:all 0.2s;
   font-weight:500;
 }
 .tab-btn.active { background:var(--pink); color:#fff; box-shadow:0 2px 8px rgba(255,154,162,0.4); }
@@ -251,7 +288,7 @@ body {
   padding:18px 14px; font-size:17px;
 }
 .preset-btn:active { border-color:var(--pink); background:var(--bg); transform:scale(0.96); }
-.preset-btn.selected { border-color:var(--pink); background:#FFF0F0; color:var(--pink); }
+.preset-btn.selected { border-color:var(--pink); background:var(--pink-soft); color:var(--pink); }
 .entry-row { display:flex; gap:8px; align-items:center; margin-bottom:8px; }
 .entry-row input {
   flex:1; padding:12px; border:2px solid var(--border); border-radius:var(--radius-sm);
@@ -264,7 +301,7 @@ body {
   background:var(--card); font-size:13px; text-align:center; cursor:pointer;
   transition:all 0.15s;
 }
-.portion-btn:active, .portion-btn.selected { border-color:var(--pink); background:#FFF0F0; color:var(--pink); }
+.portion-btn:active, .portion-btn.selected { border-color:var(--pink); background:var(--pink-soft); color:var(--pink); }
 .btn-primary {
   width:100%; padding:14px; background:var(--pink); color:#fff; border:none;
   border-radius:28px; font-size:17px; font-weight:600; cursor:pointer;
@@ -312,7 +349,7 @@ body {
 .toggle { position:relative; display:inline-block; width:48px; height:28px; min-width:48px; }
 .toggle input { opacity:0; width:0; height:0; }
 .toggle .slider {
-  position:absolute; top:0;left:0;right:0;bottom:0; background:#ddd; border-radius:28px;
+  position:absolute; top:0;left:0;right:0;bottom:0; background:var(--slider-bg); border-radius:28px;
   cursor:pointer; transition:0.2s;
 }
 .toggle .slider:before {
@@ -334,7 +371,7 @@ body {
   color:#e74c3c; border-radius:20px; font-size:13px; cursor:pointer; font-weight:500;
   text-align:center;
 }
-.btn-danger:active { background:#FFF0F0; }
+.btn-danger:active { background:var(--pink-soft); }
 .btn-danger-hint { text-align:center; font-size:11px; color:var(--text-light); margin-top:8px; }
 /* Tab bar variants */
 .tab-bar-2col { justify-content:center; }
@@ -349,7 +386,7 @@ body {
   background:var(--card); font-size:12px; color:var(--text); cursor:pointer;
   transition:all 0.15s; font-weight:500;
 }
-.filter-btn.active { border-color:var(--pink); background:#FFF0F0; color:var(--pink); }
+.filter-btn.active { border-color:var(--pink); background:var(--pink-soft); color:var(--pink); }
 .filter-date-row {
   display:flex; gap:6px; align-items:center; margin-top:4px; width:100%;
 }
@@ -420,7 +457,7 @@ body {
 .modal-box input:focus { border-color:var(--pink); }
 .modal-box .btn-row { display:flex; gap:8px; }
 .modal-box .btn-row button { flex:1; padding:10px; border-radius:20px; font-size:14px; cursor:pointer; border:none; }
-.modal-box .btn-cancel { background:#f5f5f5; color:var(--text); }
+.modal-box .btn-cancel { background:var(--bg-soft); color:var(--text); }
 .modal-box .btn-confirm { background:var(--pink); color:#fff; }
 /* Query Modal */
 .query-modal-overlay {
@@ -442,7 +479,7 @@ body {
   background:none; border:none; font-size:22px; cursor:pointer;
   color:var(--text-light); padding:4px 8px; border-radius:8px;
 }
-.query-modal-close:active { background:#f5f5f5; }
+.query-modal-close:active { background:var(--bg-soft); }
 .query-result-item {
   display:flex; align-items:center; gap:10px; padding:10px;
   background:var(--bg); border-radius:var(--radius-sm); margin-bottom:6px;
@@ -505,6 +542,19 @@ body {
     <div class="card">
       <div class="setting-item">
         <div>
+          <div class="label">深色模式</div>
+          <div class="hint">跟随系统或手动切换</div>
+        </div>
+        <select class="interval-select" id="themeSelect" onchange="setTheme(this.value)">
+          <option value="system">跟随系统</option>
+          <option value="light">浅色</option>
+          <option value="dark">深色</option>
+        </select>
+      </div>
+    </div>
+    <div class="card">
+      <div class="setting-item">
+        <div>
           <div class="label">喂养提醒</div>
           <div class="hint" id="notifStatus">未开启</div>
         </div>
@@ -532,6 +582,28 @@ body {
         <button onclick="exportLast7()">导出近7天</button>
         <button onclick="exportLast30()">导出近30天</button>
       </div>
+    </div>
+    <div class="card">
+      <div class="card-title">数据备份</div>
+      <div class="setting-item">
+        <div class="label">导出备份</div>
+        <div class="hint">下载全部记录与奶粉开罐记录为 JSON 文件</div>
+      </div>
+      <div style="padding-top:4px">
+        <button onclick="exportBackup()" style="width:100%;padding:12px;background:var(--pink);color:#fff;border:none;border-radius:var(--radius-sm);font-size:14px;font-weight:500;cursor:pointer">⬇️ 导出备份文件</button>
+      </div>
+      <div class="setting-item" style="margin-top:12px">
+        <div class="label">导入模式</div>
+        <select class="interval-select" id="backupMode">
+          <option value="merge" selected>合并（按 id 去重，较新覆盖）</option>
+          <option value="overwrite">覆盖（清空后导入）</option>
+        </select>
+      </div>
+      <div style="padding-top:4px">
+        <button onclick="importBackupFile()" style="width:100%;padding:12px;background:var(--card);color:var(--text);border:2px solid var(--pink);border-radius:var(--radius-sm);font-size:14px;font-weight:500;cursor:pointer">⬆️ 导入备份文件</button>
+        <input type="file" id="backupFileInput" accept=".json,application/json" style="display:none" onchange="handleBackupImport(this)">
+      </div>
+      <div class="hint" style="padding-top:8px">导入后自动刷新本地与云端数据，请确认备份文件来源于本应用。</div>
     </div>
     <div class="card">
       <div class="card-title">记录查询</div>
@@ -566,7 +638,7 @@ body {
     <div class="btn-danger-hint">清空后不可恢复，请谨慎操作</div>
     <button class="btn-danger" onclick="clearAllData()">清空所有数据</button>
     <div style="text-align:center;padding:16px;font-size:12px;color:var(--text-light)">
-      宝宝喂养记录 v3.10 · 数据云端同步 (Supabase)
+      宝宝喂养记录 v3.41 · 数据云端同步 (Supabase)
     </div>
     <!-- Query Record Modal -->
     <div class="query-modal-overlay" id="queryModalOverlay">
@@ -604,11 +676,11 @@ body {
 
 <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-  <script src="./app.js?v=3.40"></script>
+  <script src="./app.js?v=3.41"></script>
   <script>
     // Service Worker 注册
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('./sw.js?v=3.40').then(function(reg) {
+      navigator.serviceWorker.register('./sw.js?v=3.41').then(function(reg) {
         console.log('SW registered:', reg.scope);
       }).catch(function(err) {
         console.log('SW failed:', err);

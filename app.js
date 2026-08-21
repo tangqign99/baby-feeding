@@ -1,5 +1,5 @@
 /* ============================================
-   宝宝喂养记录 PWA - 应用逻辑 v3.40 (Supabase)
+   宝宝喂养记录 PWA - 应用逻辑 v3.41 (Supabase)
    ============================================ */
 
 const FORMULA_COST_PER_30ML = 2.28; // 30ml = 4.2g, 680g = 369元 → 每30ml费用
@@ -13,6 +13,64 @@ var _realtimeSub = null;
 
 // ------- Baby Age -------
 const BIRTH_DATE = '2025-11-11';
+
+// WHO 0-24月龄 男孩/女孩 身长(cm)/体重(kg) P3/P50/P97 参考数据
+// 来源：WHO Child Growth Standards (2006)，13-14/16-17/19-20/22-23 月为线性插值
+var WHO_GROWTH = {
+  boy: {
+    height: { months: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24],
+      p3: [46.3,51.1,54.7,57.6,60.0,61.9,63.6,65.1,66.5,67.7,69.0,70.2,71.3,72.3,73.4,74.4,75.3,76.3,77.2,78.0,78.9,79.7,80.5,81.3,82.1],
+      p50: [49.9,54.7,58.4,61.4,63.9,65.9,67.6,69.2,70.6,72.0,73.3,74.5,75.7,76.8,78.0,79.1,80.2,81.2,82.3,83.2,84.2,85.1,86.0,86.9,87.8],
+      p97: [53.4,58.4,62.2,65.3,67.8,69.9,71.6,73.2,74.7,76.2,77.6,78.9,80.2,81.4,82.7,83.9,85.0,86.2,87.3,88.4,89.4,90.5,91.5,92.6,93.6] },
+    weight: { months: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24],
+      p3: [2.5,3.4,4.4,5.1,5.6,6.1,6.4,6.7,7.0,7.2,7.5,7.7,7.8,8.0,8.2,8.4,8.6,8.7,8.9,9.0,9.2,9.3,9.5,9.6,9.8],
+      p50: [3.3,4.5,5.6,6.4,7.0,7.5,7.9,8.3,8.6,8.9,9.2,9.4,9.6,9.8,10.1,10.3,10.5,10.7,10.9,11.1,11.3,11.5,11.7,12.0,12.2],
+      p97: [4.3,5.7,7.0,7.9,8.6,9.2,9.7,10.2,10.5,10.9,11.2,11.5,11.8,12.1,12.4,12.7,13.0,13.2,13.5,13.8,14.0,14.3,14.6,14.8,15.1] }
+  },
+  girl: {
+    height: { months: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24],
+      p3: [45.6,50.0,53.2,55.8,58.0,59.9,61.5,62.9,64.3,65.6,66.8,68.0,69.2,70.3,71.3,72.4,73.3,74.3,75.2,76.1,77.0,77.9,78.7,79.5,80.3],
+      p50: [49.1,53.7,57.1,59.8,62.1,64.0,65.7,67.3,68.7,70.1,71.5,72.8,74.0,75.2,76.3,77.5,78.6,79.6,80.7,81.7,82.7,83.7,84.6,85.5,86.4],
+      p97: [52.7,57.4,60.9,63.8,66.2,68.2,70.0,71.6,73.2,74.7,76.1,77.5,78.9,80.2,81.4,82.7,83.9,85.0,86.2,87.3,88.3,89.4,90.4,91.5,92.5] },
+    weight: { months: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24],
+      p3: [2.4,3.2,4.0,4.6,5.1,5.5,5.8,6.1,6.3,6.6,6.8,7.0,7.1,7.3,7.5,7.7,7.9,8.0,8.2,8.4,8.5,8.7,8.9,9.0,9.2],
+      p50: [3.2,4.2,5.1,5.8,6.4,6.9,7.3,7.6,7.9,8.2,8.5,8.7,8.9,9.1,9.4,9.6,9.8,10.0,10.2,10.4,10.7,10.9,11.1,11.3,11.5],
+      p97: [4.2,5.4,6.5,7.4,8.1,8.7,9.2,9.6,10.0,10.4,10.7,11.0,11.3,11.6,11.9,12.2,12.5,12.7,13.0,13.3,13.5,13.8,14.1,14.3,14.6] }
+  }
+};
+
+// ------- 深色模式 -------
+const THEME_KEY = 'baby_feeding_theme';
+
+function getThemePreference() {
+  try { return localStorage.getItem(THEME_KEY) || 'system'; } catch (e) { return 'system'; }
+}
+
+function getEffectiveTheme() {
+  var pref = getThemePreference();
+  if (pref === 'light' || pref === 'dark') return pref;
+  if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) return 'dark';
+  return 'light';
+}
+
+function applyTheme() {
+  var t = getEffectiveTheme();
+  document.documentElement.setAttribute('data-theme', t);
+  // 重绘统计页图表以适配主题色
+  if (currentPage === 'stats') renderStats();
+}
+
+function setTheme(pref) {
+  if (pref !== 'system' && pref !== 'light' && pref !== 'dark') return;
+  try { localStorage.setItem(THEME_KEY, pref); } catch (e) {}
+  applyTheme();
+}
+
+function getChartTheme() {
+  var dark = getEffectiveTheme() === 'dark';
+  return dark ? { grid: 'rgba(255,255,255,0.12)', axis: '#9AA0A6', title: '#E9EAED' }
+              : { grid: '#F0E8E8', axis: '#888888', title: '#4A4A4A' };
+}
 
 function calcBabyAge() {
   var birth = new Date(BIRTH_DATE + 'T00:00:00');
@@ -301,15 +359,15 @@ function getTypeName(type) {
 
 function getIconBg(type) {
   switch (type) {
-    case 'milk': return '#FFF0F5';
-    case 'meal': return '#FFF8F0';
-    case 'snack': return '#FFFDEB';
-    case 'sleep': return '#F0F0FF';
-    case 'poop': return '#F5E6CC';
-    case 'diaper': return '#F0F8FF';
-    case 'height': return '#F0F4FF';
-    case 'weight': return '#F0FFF4';
-    default: return '#F5F5F5';
+    case 'milk': return 'var(--type-milk)';
+    case 'meal': return 'var(--type-meal)';
+    case 'snack': return 'var(--type-snack)';
+    case 'sleep': return 'var(--type-sleep)';
+    case 'poop': return 'var(--type-poop)';
+    case 'diaper': return 'var(--type-diaper)';
+    case 'height': return 'var(--type-height)';
+    case 'weight': return 'var(--type-weight)';
+    default: return 'var(--type-default)';
   }
 }
 
@@ -601,7 +659,7 @@ function showTodayDetail(type) {
     html += '<div style="text-align:center;padding:20px;color:var(--text-light)">今日暂无' + typeName + '记录</div>';
   } else if (type === 'sleep') {
     html += '<table style="width:100%;font-size:13px;border-collapse:collapse">';
-    html += '<thead><tr style="border-bottom:2px solid #F0E8E8;text-align:left;color:var(--text-light);font-size:11px"><th style="padding:8px 4px">入睡</th><th style="padding:8px 4px">醒来</th><th style="padding:8px 4px">时长</th><th style="padding:8px 4px">备注</th><th style="padding:8px 4px">操作</th></tr></thead><tbody>';
+    html += '<thead><tr style="border-bottom:2px solid var(--border);text-align:left;color:var(--text-light);font-size:11px"><th style="padding:8px 4px">入睡</th><th style="padding:8px 4px">醒来</th><th style="padding:8px 4px">时长</th><th style="padding:8px 4px">备注</th><th style="padding:8px 4px">操作</th></tr></thead><tbody>';
     dayRecords.forEach(function(r) {
       var startTs = r.sleep_start || r.timestamp;
       var endTs = r.sleep_end;
@@ -619,7 +677,7 @@ function showTodayDetail(type) {
     html += '</tbody></table>';
   } else {
     html += '<table style="width:100%;font-size:13px;border-collapse:collapse">';
-    html += '<thead><tr style="border-bottom:2px solid #F0E8E8;text-align:left;color:var(--text-light);font-size:11px"><th style="padding:8px 4px">时间</th><th style="padding:8px 4px">详情</th><th style="padding:8px 4px">备注</th><th style="padding:8px 4px">操作</th></tr></thead><tbody>';
+    html += '<thead><tr style="border-bottom:2px solid var(--border);text-align:left;color:var(--text-light);font-size:11px"><th style="padding:8px 4px">时间</th><th style="padding:8px 4px">详情</th><th style="padding:8px 4px">备注</th><th style="padding:8px 4px">操作</th></tr></thead><tbody>';
     dayRecords.forEach(function(r) {
       var detail = buildRecordDesc(r);
       html += '<tr style="border-bottom:1px solid var(--border)">' +
@@ -731,7 +789,7 @@ function showFormulaDetail() {
     html += '<div style="text-align:center;padding:20px;color:var(--text-light)">今天还没有喝奶记录</div>';
   } else {
     html += '<table style="width:100%;font-size:13px;border-collapse:collapse">';
-    html += '<thead><tr style="border-bottom:2px solid #F0E8E8;text-align:left;color:var(--text-light);font-size:11px"><th style="padding:8px 4px">时间</th><th style="padding:8px 4px">奶量</th><th style="padding:8px 4px">费用</th></tr></thead><tbody>';
+    html += '<thead><tr style="border-bottom:2px solid var(--border);text-align:left;color:var(--text-light);font-size:11px"><th style="padding:8px 4px">时间</th><th style="padding:8px 4px">奶量</th><th style="padding:8px 4px">费用</th></tr></thead><tbody>';
     dayRecords.forEach(function(r) {
       var amount = r.amount || 0;
       var cost = amount / 30 * FORMULA_COST_PER_30ML;
@@ -1830,6 +1888,27 @@ function renderStats() {
   }
   html += '</div>';
 
+  // WHO 成长曲线
+  var whoGender = getSettings().babyGender || 'boy';
+  var whoGenderLabel = whoGender === 'girl' ? '女孩' : '男孩';
+  var whoBtn = function(g, lbl) {
+    var sel = whoGender === g;
+    return '<button onclick="setBabyGender(\'' + g + '\')" style="' +
+      (sel ? 'background:var(--pink);color:#fff;' : 'background:var(--card);color:var(--text);border:1px solid var(--border);') +
+      'padding:5px 14px;border-radius:14px;font-size:12px;cursor:pointer">' + lbl + '</button>';
+  };
+  var whoHead = function(title) {
+    return '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">' +
+      '<div class="chart-title" style="margin:0">' + title + '</div>' +
+      '<div style="display:flex;gap:6px">' + whoBtn('boy', '男孩') + whoBtn('girl', '女孩') + '</div></div>';
+  };
+  html += '<div class="chart-container">' + whoHead('身高成长曲线 (WHO)') +
+    '<canvas id="heightWhoChart" width="320" height="220" style="width:100%;max-width:420px"></canvas>' +
+    '<div style="font-size:11px;color:var(--text-light);padding-top:6px">参考：WHO 标准 P3/P50/P97（' + whoGenderLabel + '）</div></div>';
+  html += '<div class="chart-container">' + whoHead('体重成长曲线 (WHO)') +
+    '<canvas id="weightWhoChart" width="320" height="220" style="width:100%;max-width:420px"></canvas>' +
+    '<div style="font-size:11px;color:var(--text-light);padding-top:6px">参考：WHO 标准 P3/P50/P97（' + whoGenderLabel + '）· 体重 kg（记录为斤，自动换算）</div></div>';
+
   container.innerHTML = html;
 
   if (hasMilk) drawMilkChart(days, milkValues, maxMilk);
@@ -1839,6 +1918,8 @@ function renderStats() {
   if (window._sleepChartData) drawSleepChart(window._sleepChartData);
   if (heightData.length >= 2) drawSingleMetricChart('heightChart', heightData, 'height', '#FF6B8A', '身高(cm)');
   if (weightData.length >= 2) drawSingleMetricChart('weightChart', weightData, 'weight', '#5BA4CF', '体重(斤)');
+  drawWhoChart('heightWhoChart', 'height', whoGender);
+  drawWhoChart('weightWhoChart', 'weight', whoGender);
 }
 
 function drawMilkChart(days, values, max) {
@@ -1862,7 +1943,7 @@ function drawMilkChart(days, values, max) {
 
   ctx.clearRect(0, 0, w, h);
 
-  ctx.strokeStyle = '#F0E8E8';
+  ctx.strokeStyle = getChartTheme().grid;
   ctx.lineWidth = 1;
   var gridLines = 4;
   for (var i = 0; i <= gridLines; i++) {
@@ -1872,7 +1953,7 @@ function drawMilkChart(days, values, max) {
     ctx.lineTo(w - pad.right, y);
     ctx.stroke();
 
-    ctx.fillStyle = '#888';
+    ctx.fillStyle = getChartTheme().axis;
     ctx.font = '11px sans-serif';
     ctx.textAlign = 'right';
     ctx.fillText(Math.round((max / gridLines) * (gridLines - i)), pad.left - 6, y + 4);
@@ -1900,13 +1981,13 @@ function drawMilkChart(days, values, max) {
     ctx.fillRect(x - 4, pad.top, barW + 8, ch);
 
     if (val > 0) {
-      ctx.fillStyle = '#4A4A4A';
+      ctx.fillStyle = getChartTheme().title;
       ctx.font = '10px sans-serif';
       ctx.textAlign = 'center';
       ctx.fillText(val, x + barW / 2, y - 4);
     }
 
-    ctx.fillStyle = '#888';
+    ctx.fillStyle = getChartTheme().axis;
     ctx.font = '10px sans-serif';
     ctx.textAlign = 'center';
     var showLabel = days.length <= 10 || (i % Math.ceil(days.length / 8) === 0) || i === days.length - 1;
@@ -1959,7 +2040,7 @@ function showDayMilkDetail(dateStr) {
   } else {
     var totalDay = 0;
     html += '<table style="width:100%;font-size:13px;border-collapse:collapse">';
-    html += '<thead><tr style="border-bottom:2px solid #F0E8E8;text-align:left;color:var(--text-light);font-size:11px"><th style="padding:8px 4px">时间</th><th style="padding:8px 4px">奶量</th><th style="padding:8px 4px">备注</th><th style="padding:8px 4px">操作</th></tr></thead><tbody>';
+    html += '<thead><tr style="border-bottom:2px solid var(--border);text-align:left;color:var(--text-light);font-size:11px"><th style="padding:8px 4px">时间</th><th style="padding:8px 4px">奶量</th><th style="padding:8px 4px">备注</th><th style="padding:8px 4px">操作</th></tr></thead><tbody>';
     dayRecords.forEach(function(r) {
       totalDay += (r.amount || 0);
       html += '<tr style="border-bottom:1px solid var(--border)">' +
@@ -2018,7 +2099,7 @@ function drawDiaperChart(chartData) {
 
   ctx.clearRect(0, 0, w, h);
 
-  ctx.strokeStyle = '#F0E8E8';
+  ctx.strokeStyle = getChartTheme().grid;
   ctx.lineWidth = 1;
   var gridLines = 4;
   for (var i = 0; i <= gridLines; i++) {
@@ -2027,7 +2108,7 @@ function drawDiaperChart(chartData) {
     ctx.moveTo(pad.left, y);
     ctx.lineTo(w - pad.right, y);
     ctx.stroke();
-    ctx.fillStyle = '#888';
+    ctx.fillStyle = getChartTheme().axis;
     ctx.font = '11px sans-serif';
     ctx.textAlign = 'right';
     ctx.fillText(Math.round((maxTotal / gridLines) * (gridLines - i)), pad.left - 6, y + 4);
@@ -2054,13 +2135,13 @@ function drawDiaperChart(chartData) {
     ctx.fillRect(x - 4, pad.top, barW + 8, ch);
 
     if (val > 0) {
-      ctx.fillStyle = '#4A4A4A';
+      ctx.fillStyle = getChartTheme().title;
       ctx.font = '10px sans-serif';
       ctx.textAlign = 'center';
       ctx.fillText(val, x + barW / 2, y - 4);
     }
 
-    ctx.fillStyle = '#888';
+    ctx.fillStyle = getChartTheme().axis;
     ctx.font = '10px sans-serif';
     ctx.textAlign = 'center';
     var showLabel = days.length <= 10 || (i % Math.ceil(days.length / 8) === 0) || i === days.length - 1;
@@ -2109,7 +2190,7 @@ function showDayDiaperDetail(dateStr) {
     html += '<div style="text-align:center;padding:20px;color:var(--text-light)">当天无尿布记录</div>';
   } else {
     html += '<table style="width:100%;font-size:13px;border-collapse:collapse">';
-    html += '<thead><tr style="border-bottom:2px solid #F0E8E8;text-align:left;color:var(--text-light);font-size:11px"><th style="padding:8px 4px">时间</th><th style="padding:8px 4px">类型</th><th style="padding:8px 4px">备注</th><th style="padding:8px 4px">操作</th></tr></thead><tbody>';
+    html += '<thead><tr style="border-bottom:2px solid var(--border);text-align:left;color:var(--text-light);font-size:11px"><th style="padding:8px 4px">时间</th><th style="padding:8px 4px">类型</th><th style="padding:8px 4px">备注</th><th style="padding:8px 4px">操作</th></tr></thead><tbody>';
     dayRecords.forEach(function(r) {
       var dt = r.diaper_type || '尿布';
       var icon = dt === '小便' ? '💧' : (dt === '大便' ? '💩' : '🧷');
@@ -2172,7 +2253,7 @@ function drawSleepChart(chartData) {
   // Grid lines (Y axis: hours, step 1h or 2h)
   var gridStep = maxTotalH <= 12 ? 2 : 4;
   var gridLines = Math.floor(maxTotalH / gridStep);
-  ctx.strokeStyle = '#F0E8E8';
+  ctx.strokeStyle = getChartTheme().grid;
   ctx.lineWidth = 1;
   for (var i = 0; i <= gridLines; i++) {
     var val = gridStep * i;
@@ -2181,7 +2262,7 @@ function drawSleepChart(chartData) {
     ctx.moveTo(pad.left, y);
     ctx.lineTo(w - pad.right, y);
     ctx.stroke();
-    ctx.fillStyle = '#888';
+    ctx.fillStyle = getChartTheme().axis;
     ctx.font = '11px sans-serif';
     ctx.textAlign = 'right';
     ctx.fillText(val + 'h', pad.left - 6, y + 4);
@@ -2239,7 +2320,7 @@ function drawSleepChart(chartData) {
     }
 
     // Date label (M/D)
-    ctx.fillStyle = '#888';
+    ctx.fillStyle = getChartTheme().axis;
     ctx.font = '10px sans-serif';
     ctx.textAlign = 'center';
     var showLabel = dates.length <= 10 || (i % Math.ceil(dates.length / 8) === 0) || i === dates.length - 1;
@@ -2257,14 +2338,14 @@ function drawSleepChart(chartData) {
   var legY = pad.top + ch + 24;
   ctx.fillStyle = '#7B68EE';
   ctx.fillRect(legX, legY, 10, 10);
-  ctx.fillStyle = '#888';
+  ctx.fillStyle = getChartTheme().axis;
   ctx.font = '10px sans-serif';
   ctx.textAlign = 'left';
   ctx.fillText('夜间', legX + 14, legY + 9);
 
   ctx.fillStyle = '#FF8C00';
   ctx.fillRect(legX + 50, legY, 10, 10);
-  ctx.fillStyle = '#888';
+  ctx.fillStyle = getChartTheme().axis;
   ctx.fillText('白天', legX + 64, legY + 9);
 
   // Click handler
@@ -2306,7 +2387,7 @@ function showDaySleepDetail(dateStr) {
   } else {
     var totalDay = 0;
     html += '<table style="width:100%;font-size:13px;border-collapse:collapse">';
-    html += '<thead><tr style="border-bottom:2px solid #F0E8E8;text-align:left;color:var(--text-light);font-size:11px"><th style="padding:8px 4px">时间</th><th style="padding:8px 4px">时长</th><th style="padding:8px 4px">类型</th></tr></thead><tbody>';
+    html += '<thead><tr style="border-bottom:2px solid var(--border);text-align:left;color:var(--text-light);font-size:11px"><th style="padding:8px 4px">时间</th><th style="padding:8px 4px">时长</th><th style="padding:8px 4px">类型</th></tr></thead><tbody>';
     dayRecords.forEach(function(r) {
       var startTs = r.sleep_start || r.timestamp;
       var endTs = r.sleep_end;
@@ -2377,7 +2458,7 @@ function drawSingleMetricChart(canvasId, data, metricKey, color, label) {
 
   ctx.clearRect(0, 0, w, h);
 
-  ctx.strokeStyle = '#F0E8E8';
+  ctx.strokeStyle = getChartTheme().grid;
   ctx.lineWidth = 1;
   var gridLines = 4;
   for (var i = 0; i <= gridLines; i++) {
@@ -2386,7 +2467,7 @@ function drawSingleMetricChart(canvasId, data, metricKey, color, label) {
     ctx.moveTo(pad.left, y);
     ctx.lineTo(w - pad.right, y);
     ctx.stroke();
-    ctx.fillStyle = '#888';
+    ctx.fillStyle = getChartTheme().axis;
     ctx.font = '10px sans-serif';
     ctx.textAlign = 'right';
     ctx.fillText(((maxVal - (maxVal - minVal) / gridLines * i)).toFixed(1), pad.left - 6, y + 3);
@@ -2396,7 +2477,7 @@ function drawSingleMetricChart(canvasId, data, metricKey, color, label) {
   for (var j = 0; j < data.length; j++) {
     var r = data[j];
     var x = pad.left + j * xGap;
-    ctx.fillStyle = '#888';
+    ctx.fillStyle = getChartTheme().axis;
     ctx.font = '9px sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText(formatDate(r.timestamp).slice(5), x, pad.top + ch + 16);
@@ -2411,7 +2492,7 @@ function drawSingleMetricChart(canvasId, data, metricKey, color, label) {
   drawLine(ctx, points, color, label);
 
   ctx.font = 'bold 12px sans-serif';
-  ctx.fillStyle = '#4A4A4A';
+  ctx.fillStyle = getChartTheme().title;
   ctx.textAlign = 'center';
   ctx.fillText(label, pad.left + cw / 2, 14);
 }
@@ -2452,7 +2533,7 @@ function drawHWChartV2(data) {
 
   ctx.clearRect(0, 0, w, h);
 
-  ctx.strokeStyle = '#F0E8E8';
+  ctx.strokeStyle = getChartTheme().grid;
   ctx.lineWidth = 1;
   var gridLines = 4;
   for (var i = 0; i <= gridLines; i++) {
@@ -2462,7 +2543,7 @@ function drawHWChartV2(data) {
     ctx.lineTo(w - pad.right, y);
     ctx.stroke();
 
-    ctx.fillStyle = '#888';
+    ctx.fillStyle = getChartTheme().axis;
     ctx.font = '10px sans-serif';
     ctx.textAlign = 'right';
     ctx.fillText(((maxVal - (maxVal - minVal) / gridLines * i)).toFixed(1), pad.left - 6, y + 3);
@@ -2472,7 +2553,7 @@ function drawHWChartV2(data) {
   for (var j = 0; j < data.length; j++) {
     var r = data[j];
     var x = pad.left + j * xGap;
-    ctx.fillStyle = '#888';
+    ctx.fillStyle = getChartTheme().axis;
     ctx.font = '9px sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText(formatDate(r.timestamp).slice(5), x, pad.top + ch + 16);
@@ -2510,6 +2591,175 @@ function drawHWChartV2(data) {
   }
 }
 
+function monthAgeOf(ts) {
+  var birth = new Date(BIRTH_DATE + 'T00:00:00').getTime();
+  return Math.max(0, (ts - birth) / (30.4375 * 24 * 3600 * 1000));
+}
+
+function setBabyGender(g) {
+  if (g !== 'boy' && g !== 'girl') return;
+  var s = getSettings();
+  s.babyGender = g;
+  saveSettings(s);
+  renderStats();
+}
+
+// 提取身高(cm)或体重(kg)的按时间排序宝宝数据，用于 WHO 曲线
+function getHwDataForWho(metricType) {
+  var birth = new Date(BIRTH_DATE + 'T00:00:00').getTime();
+  var map = {};
+  getRecords().forEach(function(r) {
+    var d = formatDate(r.timestamp);
+    if (!map[d]) map[d] = { date: d, ts: r.timestamp, height: undefined, weight: undefined };
+    if (r.type === 'hw') {
+      if (r.height !== undefined) map[d].height = r.height;
+      if (r.weight !== undefined) map[d].weight = r.weight;
+    } else if (r.type === 'height' && r.height !== undefined) {
+      map[d].height = r.height;
+    } else if (r.type === 'weight' && r.weight !== undefined) {
+      map[d].weight = r.weight;
+    }
+    if (r.timestamp > map[d].ts) map[d].ts = r.timestamp;
+  });
+  var arr = [];
+  Object.keys(map).sort().forEach(function(k) {
+    var item = map[k];
+    if (metricType === 'height' && item.height !== undefined) {
+      arr.push({ month: Math.max(0, (item.ts - birth) / (30.4375 * 24 * 3600 * 1000)), val: item.height, date: item.date });
+    } else if (metricType === 'weight' && item.weight !== undefined) {
+      arr.push({ month: Math.max(0, (item.ts - birth) / (30.4375 * 24 * 3600 * 1000)), val: item.weight / 2, date: item.date });
+    }
+  });
+  arr.sort(function(a, b) { return a.month - b.month; });
+  return arr;
+}
+
+// WHO 成长曲线：叠加宝宝记录 + P3/P50/P97 参考线，标注最近一次测量
+function drawWhoChart(canvasId, metricType, gender) {
+  var canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  var ctx = canvas.getContext('2d');
+  var dpr = window.devicePixelRatio || 1;
+  var rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = 220 * dpr;
+  ctx.scale(dpr, dpr);
+  canvas.style.height = '220px';
+
+  var w = rect.width;
+  var h = 220;
+  var pad = { top: 16, right: 14, bottom: 30, left: 44 };
+  var cw = w - pad.left - pad.right;
+  var ch = h - pad.top - pad.bottom;
+  var maxMonth = 24;
+
+  var who = WHO_GROWTH[gender] ? WHO_GROWTH[gender][metricType] : null;
+  if (!who) return;
+  var hw = getHwDataForWho(metricType);
+  var theme = getChartTheme();
+
+  // 纵轴范围：WHO + 宝宝数据
+  var minV = Infinity, maxV = -Infinity;
+  who.p3.forEach(function(v) { if (v < minV) minV = v; });
+  who.p97.forEach(function(v) { if (v > maxV) maxV = v; });
+  hw.forEach(function(d) { if (d.val < minV) minV = d.val; if (d.val > maxV) maxV = d.val; });
+  if (!isFinite(minV) || !isFinite(maxV)) { minV = 0; maxV = 1; }
+  var span = (maxV - minV) || 1;
+  minV = Math.max(0, minV - span * 0.12);
+  maxV = maxV + span * 0.12;
+
+  function X(m) { return pad.left + (m / maxMonth) * cw; }
+  function Y(v) { return pad.top + ch - ((v - minV) / (maxV - minV)) * ch; }
+
+  ctx.clearRect(0, 0, w, h);
+
+  // 网格 + Y 轴
+  ctx.strokeStyle = theme.grid;
+  ctx.lineWidth = 1;
+  var gridLines = 4;
+  for (var i = 0; i <= gridLines; i++) {
+    var y = pad.top + (ch / gridLines) * i;
+    ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(w - pad.right, y); ctx.stroke();
+    ctx.fillStyle = theme.axis;
+    ctx.font = '10px sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText((maxV - (maxV - minV) / gridLines * i).toFixed(1), pad.left - 6, y + 3);
+  }
+  // X 轴刻度（月龄）
+  ctx.fillStyle = theme.axis;
+  ctx.font = '10px sans-serif';
+  ctx.textAlign = 'center';
+  for (var m = 0; m <= maxMonth; m += 3) {
+    ctx.fillText(m + '月', X(m), pad.top + ch + 15);
+  }
+
+  // WHO P3/P50/P97 参考线
+  function drawWhoLine(arr, color, width) {
+    ctx.strokeStyle = color;
+    ctx.lineWidth = width;
+    ctx.setLineDash(arr === who.p50 ? [] : [4, 3]);
+    ctx.beginPath();
+    for (var i = 0; i < arr.length; i++) {
+      var x = X(i), y = Y(arr[i]);
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  drawWhoLine(who.p3, 'rgba(160,160,160,0.7)', 1.5);
+  drawWhoLine(who.p50, 'rgba(110,110,110,0.95)', 2);
+  drawWhoLine(who.p97, 'rgba(160,160,160,0.7)', 1.5);
+
+  // 空态
+  if (hw.length === 0) {
+    ctx.fillStyle = theme.axis;
+    ctx.font = '13px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('暂无' + (metricType === 'height' ? '身高' : '体重') + '记录', pad.left + cw / 2, pad.top + ch / 2);
+    return;
+  }
+
+  var color = metricType === 'height' ? '#FF6B8A' : '#5BA4CF';
+  var pts = hw.map(function(d) { return { x: X(d.month), y: Y(d.val), val: d.val, date: d.date, month: d.month }; });
+
+  // 宝宝折线
+  if (pts.length >= 2) {
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2.5;
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    pts.forEach(function(p, i) { if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y); });
+    ctx.stroke();
+  }
+  // 散点
+  pts.forEach(function(p) {
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = color;
+    ctx.beginPath(); ctx.arc(p.x, p.y, 3, 0, Math.PI * 2); ctx.fill();
+  });
+
+  // 最近一次测量标注
+  var last = pts[pts.length - 1];
+  var label = metricType === 'height' ? (last.val.toFixed(1) + ' cm') : (last.val.toFixed(1) + ' kg');
+  var lx = last.x + 6, ly = last.y - 8;
+  if (lx + 110 > w - pad.right) lx = last.x - 6 - 110;
+  if (ly < pad.top + 8) ly = last.y + 20;
+  ctx.fillStyle = color;
+  ctx.font = 'bold 10px sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillText('最近 ' + label, lx, ly);
+  ctx.font = '9px sans-serif';
+  ctx.fillStyle = theme.axis;
+  ctx.fillText(last.date + ' · ' + last.month.toFixed(1) + '月', lx, ly + 11);
+
+  // 图例
+  ctx.font = '10px sans-serif';
+  ctx.fillStyle = theme.axis;
+  ctx.textAlign = 'left';
+  ctx.fillText('-- P3/P97    -- P50    ● 宝宝', pad.left, pad.top + ch + 28);
+}
+
 function drawLine(ctx, points, color, label) {
   if (points.length < 2) return;
   ctx.strokeStyle = color;
@@ -2545,6 +2795,8 @@ function renderSettings() {
   document.getElementById('notifToggle').checked = s.notifEnabled;
   document.getElementById('intervalSelect').value = s.interval;
   document.getElementById('notifStatus').textContent = s.notifEnabled ? '已开启 · ' + (s.interval / 60) + '小时提醒' : '未开启';
+  var themeSel = document.getElementById('themeSelect');
+  if (themeSel) themeSel.value = getThemePreference();
   renderFormulaCans();
 }
 
@@ -2686,6 +2938,153 @@ async function clearAllData() {
   }
 }
 
+// ------- 数据备份 / 导入 -------
+function exportBackup() {
+  var data = {
+    app: 'baby-feeding',
+    version: '3.41',
+    exportedAt: new Date().toISOString(),
+    records: getRecords(),
+    formulaCans: getFormulaCans()
+  };
+  var blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  var d = new Date();
+  var p2 = function(n) { return n.toString().padStart(2, '0'); };
+  a.download = 'baby-feeding-backup-' + d.getFullYear() + p2(d.getMonth() + 1) + p2(d.getDate()) + '.json';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(function() { URL.revokeObjectURL(url); a.remove(); }, 1000);
+  toast('备份已导出：' + getRecords().length + ' 条记录、' + getFormulaCans().length + ' 条开罐记录', 'success');
+}
+
+function importBackupFile() {
+  var input = document.getElementById('backupFileInput');
+  if (input) input.click();
+}
+
+function handleBackupImport(input) {
+  var file = input.files && input.files[0];
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var obj = null;
+    try {
+      obj = JSON.parse(e.target.result);
+    } catch (err) {
+      toast('备份文件解析失败：不是有效的 JSON', 'warning');
+      input.value = '';
+      return;
+    }
+    if (!obj || typeof obj !== 'object' || !Array.isArray(obj.records)) {
+      toast('备份文件格式无效：缺少 records 数组', 'warning');
+      input.value = '';
+      return;
+    }
+    if (obj.formulaCans !== undefined && !Array.isArray(obj.formulaCans)) {
+      toast('备份文件格式无效：formulaCans 必须是数组', 'warning');
+      input.value = '';
+      return;
+    }
+    var mode = (document.getElementById('backupMode') || {}).value || 'merge';
+    importBackupData(obj, mode).then(function() { input.value = ''; });
+  };
+  reader.readAsText(file);
+}
+
+function recordToISO(r) {
+  var clean = {};
+  for (var k in r) clean[k] = r[k];
+  if (typeof clean.timestamp === 'number') clean.timestamp = new Date(clean.timestamp).toISOString();
+  if (typeof clean.sleep_start === 'number') clean.sleep_start = new Date(clean.sleep_start).toISOString();
+  if (typeof clean.sleep_end === 'number') clean.sleep_end = new Date(clean.sleep_end).toISOString();
+  return clean;
+}
+
+async function importBackupData(obj, mode) {
+  var backupRecords = obj.records.slice();
+  var backupCans = Array.isArray(obj.formulaCans) ? obj.formulaCans.slice() : [];
+  try {
+    if (mode === 'overwrite') {
+      if (backupRecords.length === 0) { toast('备份中没有记录可导入', 'warning'); return; }
+      // 清空云端后全量导入（保留原 id）
+      var { error: delErr } = await supabase.from('feeding_records').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      if (delErr) throw delErr;
+      var ups = backupRecords.map(recordToISO);
+      var { data: inserted, error: insErr } = await supabase.from('feeding_records').insert(ups).select();
+      if (insErr) throw insErr;
+      cachedRecords = normalizeTimestamps(inserted || ups);
+      saveFormulaCans(backupCans);
+      toast('导入成功：覆盖 ' + cachedRecords.length + ' 条记录、' + backupCans.length + ' 条开罐记录', 'success');
+    } else {
+      // 合并：按 id 去重，时间戳较新的覆盖旧值
+      var merged = cachedRecords.slice();
+      var idMap = {};
+      var keyMap = {};
+      merged.forEach(function(r) {
+        if (r.id !== undefined && r.id !== null) idMap[r.id] = r;
+        keyMap[(r.timestamp || 0) + '|' + r.type] = true;
+      });
+      var toSync = [];
+      var added = 0, updated = 0;
+      backupRecords.forEach(function(br) {
+        var bid = br.id;
+        if (bid !== undefined && bid !== null && idMap[bid] !== undefined) {
+          var local = idMap[bid];
+          if ((br.timestamp || 0) > (local.timestamp || 0)) {
+            for (var i = 0; i < merged.length; i++) {
+              if (merged[i].id === bid) { merged[i] = br; break; }
+            }
+            idMap[bid] = br;
+            toSync.push(br);
+            updated++;
+          }
+        } else if (bid === undefined || bid === null) {
+          var key = (br.timestamp || 0) + '|' + br.type;
+          if (!keyMap[key]) {
+            merged.push(br);
+            keyMap[key] = true;
+            toSync.push(br);
+            added++;
+          }
+        } else {
+          merged.push(br);
+          idMap[bid] = br;
+          keyMap[(br.timestamp || 0) + '|' + br.type] = true;
+          toSync.push(br);
+          added++;
+        }
+      });
+      cachedRecords = merged;
+      // 合并开罐记录（按 id 去重，较新覆盖）
+      var canMap = {};
+      getFormulaCans().forEach(function(c) { canMap[c.id] = c; });
+      backupCans.forEach(function(c) {
+        if (!canMap[c.id] || (c.ts || 0) > (canMap[c.id].ts || 0)) canMap[c.id] = c;
+      });
+      var mergedCans = Object.keys(canMap).map(function(k) { return canMap[k]; })
+        .sort(function(a, b) { return (b.ts || 0) - (a.ts || 0); });
+      saveFormulaCans(mergedCans);
+      // 同步云端（有 id 的走 upsert 更新/新增，无 id 的走 insert）
+      if (toSync.length > 0) {
+        var ups = toSync.map(recordToISO);
+        var { error: syncErr } = await supabase.from('feeding_records').upsert(ups, { onConflict: 'id' });
+        if (syncErr) throw syncErr;
+      }
+      toast('导入成功：新增 ' + added + ' 条、更新 ' + updated + ' 条；开罐记录 ' + mergedCans.length + ' 条', 'success');
+    }
+    // 刷新界面
+    renderDashboard();
+    renderFormulaCans();
+    if (currentPage === 'stats') renderStats();
+    else if (currentPage === 'timeline') renderTimeline();
+  } catch (e) {
+    toast('导入失败：' + e.message, 'warning');
+  }
+}
+
 // ------- Notification -------
 var timerInterval = null;
 
@@ -2804,7 +3203,7 @@ function drawFormulaMonthlyChart() {
 
   ctx.clearRect(0, 0, w, h);
 
-  ctx.strokeStyle = '#F0E8E8';
+  ctx.strokeStyle = getChartTheme().grid;
   ctx.lineWidth = 1;
   var gridLines = 4;
   for (var i = 0; i <= gridLines; i++) {
@@ -2813,7 +3212,7 @@ function drawFormulaMonthlyChart() {
     ctx.moveTo(pad.left, y);
     ctx.lineTo(w - pad.right, y);
     ctx.stroke();
-    ctx.fillStyle = '#888';
+    ctx.fillStyle = getChartTheme().axis;
     ctx.font = '11px sans-serif';
     ctx.textAlign = 'right';
     ctx.fillText('¥' + Math.round(maxCost / gridLines * (gridLines - i)), pad.left - 6, y + 4);
@@ -2839,13 +3238,13 @@ function drawFormulaMonthlyChart() {
     ctx.fill();
 
     if (val > 0) {
-      ctx.fillStyle = '#4A4A4A';
+      ctx.fillStyle = getChartTheme().title;
       ctx.font = '10px sans-serif';
       ctx.textAlign = 'center';
       ctx.fillText('¥' + Math.round(val), x + barW / 2, y - 4);
     }
 
-    ctx.fillStyle = '#888';
+    ctx.fillStyle = getChartTheme().axis;
     ctx.font = '10px sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText(m.monthLabel, x + barW / 2, pad.top + ch + 18);
@@ -2880,7 +3279,7 @@ function drawFormulaCostChart(chartData) {
 
   ctx.clearRect(0, 0, w, h);
 
-  ctx.strokeStyle = '#F0E8E8';
+  ctx.strokeStyle = getChartTheme().grid;
   ctx.lineWidth = 1;
   var gridLines = 4;
   for (var i = 0; i <= gridLines; i++) {
@@ -2890,7 +3289,7 @@ function drawFormulaCostChart(chartData) {
     ctx.lineTo(w - pad.right, y);
     ctx.stroke();
 
-    ctx.fillStyle = '#888';
+    ctx.fillStyle = getChartTheme().axis;
     ctx.font = '11px sans-serif';
     ctx.textAlign = 'right';
     ctx.fillText('¥' + (maxCost / gridLines * (gridLines - i)).toFixed(1), pad.left - 6, y + 4);
@@ -2916,13 +3315,13 @@ function drawFormulaCostChart(chartData) {
     ctx.fillRect(x - 4, pad.top, barW + 8, ch);
 
     if (val > 0) {
-      ctx.fillStyle = '#4A4A4A';
+      ctx.fillStyle = getChartTheme().title;
       ctx.font = '10px sans-serif';
       ctx.textAlign = 'center';
       ctx.fillText('¥' + val.toFixed(2), x + barW / 2, y - 4);
     }
 
-    ctx.fillStyle = '#888';
+    ctx.fillStyle = getChartTheme().axis;
     ctx.font = '10px sans-serif';
     ctx.textAlign = 'center';
     var showLabel = dates.length <= 10 || (i % Math.ceil(dates.length / 8) === 0) || i === dates.length - 1;
@@ -2972,7 +3371,7 @@ function showDayFormulaDetail(dateStr) {
   } else {
     var totalCost = 0;
     html += '<table style="width:100%;font-size:13px;border-collapse:collapse">';
-    html += '<thead><tr style="border-bottom:2px solid #F0E8E8;text-align:left;color:var(--text-light);font-size:11px"><th style="padding:8px 4px">时间</th><th style="padding:8px 4px">奶量</th><th style="padding:8px 4px">费用</th></tr></thead><tbody>';
+    html += '<thead><tr style="border-bottom:2px solid var(--border);text-align:left;color:var(--text-light);font-size:11px"><th style="padding:8px 4px">时间</th><th style="padding:8px 4px">奶量</th><th style="padding:8px 4px">费用</th></tr></thead><tbody>';
     dayRecords.forEach(function(r) {
       var cost = (r.amount || 0) / 30 * FORMULA_COST_PER_30ML;
       totalCost += cost;
@@ -3093,7 +3492,7 @@ function showMonthFormulaDetail() {
     html += '<div style="text-align:center;padding:20px;color:var(--text-light)">本月暂无开罐记录</div>';
   } else {
     html += '<table style="width:100%;font-size:13px;border-collapse:collapse">' +
-      '<thead><tr style="border-bottom:2px solid #F0E8E8;text-align:left;color:var(--text-light);font-size:11px"><th style="padding:8px 4px">日期</th><th style="padding:8px 4px">操作</th></tr></thead><tbody>';
+      '<thead><tr style="border-bottom:2px solid var(--border);text-align:left;color:var(--text-light);font-size:11px"><th style="padding:8px 4px">日期</th><th style="padding:8px 4px">操作</th></tr></thead><tbody>';
     cans.forEach(function(c) {
       html += '<tr style="border-bottom:1px solid var(--border)">' +
         '<td style="padding:8px 4px">📦 ' + c.date + '</td>' +
@@ -3231,7 +3630,7 @@ function showQueryTypeDetail(dateStr, type) {
     html += '<div style="text-align:center;padding:20px;color:var(--text-light)">暂无' + typeName + '记录</div>';
   } else if (type === 'sleep') {
     html += '<table style="width:100%;font-size:13px;border-collapse:collapse">';
-    html += '<thead><tr style="border-bottom:2px solid #F0E8E8;text-align:left;color:var(--text-light);font-size:11px"><th style="padding:8px 4px">入睡</th><th style="padding:8px 4px">醒来</th><th style="padding:8px 4px">时长</th><th style="padding:8px 4px">备注</th><th style="padding:8px 4px">操作</th></tr></thead><tbody>';
+    html += '<thead><tr style="border-bottom:2px solid var(--border);text-align:left;color:var(--text-light);font-size:11px"><th style="padding:8px 4px">入睡</th><th style="padding:8px 4px">醒来</th><th style="padding:8px 4px">时长</th><th style="padding:8px 4px">备注</th><th style="padding:8px 4px">操作</th></tr></thead><tbody>';
     dayRecords.forEach(function(r) {
       var dur = (r.sleep_start && r.sleep_end && r.sleep_end > r.sleep_start) ? (r.sleep_end - r.sleep_start) : 0;
       var h = Math.floor(dur / 3600000);
@@ -3247,7 +3646,7 @@ function showQueryTypeDetail(dateStr, type) {
     html += '</tbody></table>';
   } else {
     html += '<table style="width:100%;font-size:13px;border-collapse:collapse">';
-    html += '<thead><tr style="border-bottom:2px solid #F0E8E8;text-align:left;color:var(--text-light);font-size:11px"><th style="padding:8px 4px">时间</th><th style="padding:8px 4px">内容</th><th style="padding:8px 4px">备注</th><th style="padding:8px 4px">操作</th></tr></thead><tbody>';
+    html += '<thead><tr style="border-bottom:2px solid var(--border);text-align:left;color:var(--text-light);font-size:11px"><th style="padding:8px 4px">时间</th><th style="padding:8px 4px">内容</th><th style="padding:8px 4px">备注</th><th style="padding:8px 4px">操作</th></tr></thead><tbody>';
     dayRecords.forEach(function(r) {
       var desc = buildRecordDesc(r);
       html += '<tr style="border-bottom:1px solid var(--border)">' +
@@ -3462,7 +3861,7 @@ function showQueryDayFormulaCans(dateStr) {
     html += '<div style="text-align:center;padding:20px;color:var(--text-light)">当日暂无开罐记录</div>';
   } else {
     html += '<table style="width:100%;font-size:13px;border-collapse:collapse">' +
-      '<thead><tr style="border-bottom:2px solid #F0E8E8;text-align:left;color:var(--text-light);font-size:11px"><th style="padding:8px 4px">开罐时间</th><th style="padding:8px 4px">操作</th></tr></thead><tbody>';
+      '<thead><tr style="border-bottom:2px solid var(--border);text-align:left;color:var(--text-light);font-size:11px"><th style="padding:8px 4px">开罐时间</th><th style="padding:8px 4px">操作</th></tr></thead><tbody>';
     cans.forEach(function(c) {
       html += '<tr style="border-bottom:1px solid var(--border)">' +
         '<td style="padding:8px 4px">📦 ' + c.date + '</td>' +
@@ -3488,6 +3887,15 @@ function closeQueryDayFormulaCans(e) {
 // ------- Init -------
 async function init() {
   supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+  // 应用深色模式（跟随系统 / 手动），并监听系统主题变化
+  applyTheme();
+  var mq = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+  if (mq && mq.addEventListener) {
+    mq.addEventListener('change', function() {
+      if (getThemePreference() === 'system') applyTheme();
+    });
+  }
 
   document.querySelectorAll('.nav-item').forEach(function(item) {
     item.addEventListener('click', function() {

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'baby-feeding-v3.40';
+﻿const CACHE_NAME = 'baby-feeding-v3.41';
 const ASSETS = [
   './',
   './index.html',
@@ -27,13 +27,13 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
 
-  // Supabase API 和 CDN 动态数据始终走网络，不缓存
+  // Supabase API 鍜?CDN 鍔ㄦ€佹暟鎹缁堣蛋缃戠粶锛屼笉缂撳瓨
   if (event.request.url.includes('supabase.co') ||
       event.request.url.includes('cdn.jsdelivr.net')) {
-    return; // 不拦截，直接走浏览器默认网络请求
+    return; // 涓嶆嫤鎴紝鐩存帴璧版祻瑙堝櫒榛樿缃戠粶璇锋眰
   }
 
-  // SheetJS CDN 有独立缓存策略
+  // SheetJS CDN 鏈夌嫭绔嬬紦瀛樼瓥鐣?
   if (event.request.url.includes('cdn.sheetjs.com')) {
     event.respondWith(
       caches.match(event.request).then((cached) => {
@@ -48,7 +48,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 静态资源：缓存优先，网络更新
+  // 闈欐€佽祫婧愶細缂撳瓨浼樺厛锛岀綉缁滄洿鏂?
   event.respondWith(
     caches.match(event.request).then((cached) => {
       return cached || fetch(event.request).then((response) => {
@@ -65,3 +65,4 @@ self.addEventListener('fetch', (event) => {
     })
   );
 });
+
