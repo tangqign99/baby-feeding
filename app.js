@@ -2778,9 +2778,15 @@ function saveFormulaCans(cans) {
   localStorage.setItem(FORMULA_CANS_KEY, JSON.stringify(cans));
 }
 
+function formatDateTimeMinute(ts) {
+  var d = new Date(ts);
+  var p = function(n) { return n.toString().padStart(2, '0'); };
+  return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+}
+
 function addFormulaCan() {
   var cans = getFormulaCans();
-  var rec = { date: formatDate(Date.now()), id: Date.now().toString(36) + Math.random().toString(36).slice(2, 7) };
+  var rec = { date: formatDateTimeMinute(Date.now()), ts: Date.now(), id: Date.now().toString(36) + Math.random().toString(36).slice(2, 7) };
   cans.unshift(rec);
   saveFormulaCans(cans);
   renderFormulaCans();
