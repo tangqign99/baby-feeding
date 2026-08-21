@@ -156,6 +156,14 @@ body {
   transition: all 0.15s; line-height: 1;
 }
 .rc-delete-btn:hover, .rc-delete-btn:active { color: #e74c3c; background: #FFF0F0; }
+.rc-edit-btn {
+  position: absolute; top: 8px; right: 40px;
+  width: 26px; height: 26px; border-radius: 50%; border: none;
+  background: transparent; color: #ccc; font-size: 14px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.15s; line-height: 1;
+}
+.rc-edit-btn:hover, .rc-edit-btn:active { color: var(--pink); background: #FFF0F0; }
 /* Note toggle in record cards */
 .rc-note-toggle {
   font-size: 11px; color: var(--pink); cursor: pointer;
@@ -190,6 +198,13 @@ body {
   transition: all 0.15s; flex-shrink: 0;
 }
 .tl-delete-btn:active { color: #e74c3c; background: #FFF0F0; }
+.tl-edit-btn {
+  width: 28px; height: 28px; border-radius: 50%; border: none;
+  background: transparent; color: #ccc; font-size: 13px; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: all 0.15s; flex-shrink: 0; line-height: 1;
+}
+.tl-edit-btn:active, .tl-edit-btn:hover { color: var(--pink); background: #FFF0F0; }
 /* Datetime input */
 .datetime-row { margin-bottom: 4px; }
 .datetime-row .dt-date {
@@ -589,11 +604,11 @@ body {
 
 <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-  <script src="./app.js?v=3.38"></script>
+  <script src="./app.js?v=3.39"></script>
   <script>
     // Service Worker 注册
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('./sw.js?v=3.38').then(function(reg) {
+      navigator.serviceWorker.register('./sw.js?v=3.39').then(function(reg) {
         console.log('SW registered:', reg.scope);
       }).catch(function(err) {
         console.log('SW failed:', err);

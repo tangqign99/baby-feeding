@@ -1,5 +1,5 @@
 /* ============================================
-   宝宝喂养记录 PWA - 应用逻辑 v3.38 (Supabase)
+   宝宝喂养记录 PWA - 应用逻辑 v3.39 (Supabase)
    ============================================ */
 
 const FORMULA_COST_PER_30ML = 2.28; // 30ml = 4.2g, 680g = 369元 → 每30ml费用
@@ -366,6 +366,39 @@ async function deleteRecord(id) {
   }
 }
 
+// 更新记录：保留 id 同步到 Supabase，并更新本地缓存
+async function updateRecord(record) {
+  var id = record.id;
+  var clean = {};
+  for (var k in record) {
+    if (k !== 'id') clean[k] = record[k];
+  }
+  if (typeof clean.timestamp === 'number') clean.timestamp = new Date(clean.timestamp).toISOString();
+  if (typeof clean.sleep_start === 'number') clean.sleep_start = new Date(clean.sleep_start).toISOString();
+  if (typeof clean.sleep_end === 'number') clean.sleep_end = new Date(clean.sleep_end).toISOString();
+  try {
+    var { data, error } = await supabase
+      .from('feeding_records')
+      .update(clean)
+      .eq('id', id)
+      .select();
+    if (error) throw error;
+    if (data && data.length > 0) {
+      normalizeTimestamps(data);
+      for (var i = 0; i < cachedRecords.length; i++) {
+        if (cachedRecords[i].id === id) {
+          cachedRecords[i] = data[0];
+          break;
+        }
+      }
+    }
+    return true;
+  } catch (e) {
+    toast('更新失败: ' + e.message, 'warning');
+    return false;
+  }
+}
+
 // ------- Dashboard -------
 function getActiveSleep() {
   var records = getRecords();
@@ -509,6 +542,7 @@ function renderDashboard() {
         noteHtml +
         '<div class="rc-meta"><span class="rc-time">' + formatTime(r.timestamp) + '</span><span class="rc-ago">' + timeAgo(r.timestamp) + '</span></div>' +
         '</div>' +
+        '<button class="rc-edit-btn" title="编辑" onclick="event.stopPropagation();showEditRecord(\'' + r.id + '\')">✎</button>' +
         '<button class="rc-delete-btn" title="删除" onclick="event.stopPropagation();deleteRecord(\'' + r.id + '\')">&times;</button>' +
         '</div>';
     });
@@ -567,7 +601,7 @@ function showTodayDetail(type) {
     html += '<div style="text-align:center;padding:20px;color:var(--text-light)">今日暂无' + typeName + '记录</div>';
   } else if (type === 'sleep') {
     html += '<table style="width:100%;font-size:13px;border-collapse:collapse">';
-    html += '<thead><tr style="border-bottom:2px solid #F0E8E8;text-align:left;color:var(--text-light);font-size:11px"><th style="padding:8px 4px">入睡</th><th style="padding:8px 4px">醒来</th><th style="padding:8px 4px">时长</th><th style="padding:8px 4px">备注</th></tr></thead><tbody>';
+    html += '<thead><tr style="border-bottom:2px solid #F0E8E8;text-align:left;color:var(--text-light);font-size:11px"><th style="padding:8px 4px">入睡</th><th style="padding:8px 4px">醒来</th><th style="padding:8px 4px">时长</th><th style="padding:8px 4px">备注</th><th style="padding:8px 4px">操作</th></tr></thead><tbody>';
     dayRecords.forEach(function(r) {
       var startTs = r.sleep_start || r.timestamp;
       var endTs = r.sleep_end;
@@ -579,18 +613,20 @@ function showTodayDetail(type) {
         '<td style="padding:8px 4px;white-space:nowrap">' + (endTs ? formatTime(endTs) : '--') + '</td>' +
         '<td style="padding:8px 4px;font-weight:600;color:var(--pink);white-space:nowrap">' + (dur > 0 ? sh + 'h' + sm + 'm' : '--') + '</td>' +
         '<td style="padding:8px 4px;color:var(--text-light);font-size:12px">' + (r.note || '') + '</td>' +
+        '<td style="padding:8px 4px;white-space:nowrap"><button class="tl-edit-btn" title="编辑" onclick="showEditRecord(\'' + r.id + '\')">✎</button></td>' +
         '</tr>';
     });
     html += '</tbody></table>';
   } else {
     html += '<table style="width:100%;font-size:13px;border-collapse:collapse">';
-    html += '<thead><tr style="border-bottom:2px solid #F0E8E8;text-align:left;color:var(--text-light);font-size:11px"><th style="padding:8px 4px">时间</th><th style="padding:8px 4px">详情</th><th style="padding:8px 4px">备注</th></tr></thead><tbody>';
+    html += '<thead><tr style="border-bottom:2px solid #F0E8E8;text-align:left;color:var(--text-light);font-size:11px"><th style="padding:8px 4px">时间</th><th style="padding:8px 4px">详情</th><th style="padding:8px 4px">备注</th><th style="padding:8px 4px">操作</th></tr></thead><tbody>';
     dayRecords.forEach(function(r) {
       var detail = buildRecordDesc(r);
       html += '<tr style="border-bottom:1px solid var(--border)">' +
         '<td style="padding:8px 4px;white-space:nowrap">' + formatTime(r.timestamp) + '</td>' +
         '<td style="padding:8px 4px;font-weight:600;color:var(--pink)">' + detail + '</td>' +
         '<td style="padding:8px 4px;color:var(--text-light);font-size:12px">' + (r.note || '') + '</td>' +
+        '<td style="padding:8px 4px;white-space:nowrap"><button class="tl-edit-btn" title="编辑" onclick="showEditRecord(\'' + r.id + '\')">✎</button></td>' +
         '</tr>';
     });
     html += '</tbody></table>';
@@ -1410,6 +1446,7 @@ function renderTimeline() {
           '<div class="tl-icon" style="background:' + getIconBg(r.type) + ';border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;">' + getTypeIcon(r.type) + '</div>' +
           '<div class="tl-content"><div class="tl-title">' + desc + '</div>' + tlNoteHtml + '<div class="tl-time">' + formatTime(r.timestamp) + intervalStr + '</div></div>' +
           '<div class="tl-ago">' + timeAgo(r.timestamp) + '</div>' +
+          '<button class="tl-edit-btn" title="编辑" onclick="event.stopPropagation();showEditRecord(\'' + r.id + '\')">✎</button>' +
           '<button class="tl-delete-btn" title="删除" onclick="event.stopPropagation();deleteRecord(\'' + r.id + '\')">&times;</button>' +
           '</div>';
       });
@@ -1797,19 +1834,20 @@ function showDayMilkDetail(dateStr) {
   } else {
     var totalDay = 0;
     html += '<table style="width:100%;font-size:13px;border-collapse:collapse">';
-    html += '<thead><tr style="border-bottom:2px solid #F0E8E8;text-align:left;color:var(--text-light);font-size:11px"><th style="padding:8px 4px">时间</th><th style="padding:8px 4px">奶量</th><th style="padding:8px 4px">备注</th></tr></thead><tbody>';
+    html += '<thead><tr style="border-bottom:2px solid #F0E8E8;text-align:left;color:var(--text-light);font-size:11px"><th style="padding:8px 4px">时间</th><th style="padding:8px 4px">奶量</th><th style="padding:8px 4px">备注</th><th style="padding:8px 4px">操作</th></tr></thead><tbody>';
     dayRecords.forEach(function(r) {
       totalDay += (r.amount || 0);
       html += '<tr style="border-bottom:1px solid var(--border)">' +
         '<td style="padding:8px 4px;white-space:nowrap">' + formatTime(r.timestamp) + '</td>' +
         '<td style="padding:8px 4px;font-weight:600;color:var(--pink)">' + (r.amount || 0) + ' ml</td>' +
         '<td style="padding:8px 4px;color:var(--text-light);font-size:12px">' + (r.note || '') + '</td>' +
+        '<td style="padding:8px 4px;white-space:nowrap"><button class="tl-edit-btn" title="编辑" onclick="showEditRecord(\'' + r.id + '\')">✎</button></td>' +
         '</tr>';
     });
     html += '<tr style="font-weight:700;border-top:2px solid var(--border)">' +
       '<td style="padding:10px 4px">当日合计</td>' +
       '<td style="padding:10px 4px;color:var(--pink)">' + totalDay + ' ml</td>' +
-      '<td></td></tr>';
+      '<td></td><td></td></tr>';
     html += '</tbody></table>';
   }
 
@@ -1943,7 +1981,7 @@ function showDayDiaperDetail(dateStr) {
     html += '<div style="text-align:center;padding:20px;color:var(--text-light)">当天无尿布记录</div>';
   } else {
     html += '<table style="width:100%;font-size:13px;border-collapse:collapse">';
-    html += '<thead><tr style="border-bottom:2px solid #F0E8E8;text-align:left;color:var(--text-light);font-size:11px"><th style="padding:8px 4px">时间</th><th style="padding:8px 4px">类型</th><th style="padding:8px 4px">备注</th></tr></thead><tbody>';
+    html += '<thead><tr style="border-bottom:2px solid #F0E8E8;text-align:left;color:var(--text-light);font-size:11px"><th style="padding:8px 4px">时间</th><th style="padding:8px 4px">类型</th><th style="padding:8px 4px">备注</th><th style="padding:8px 4px">操作</th></tr></thead><tbody>';
     dayRecords.forEach(function(r) {
       var dt = r.diaper_type || '尿布';
       var icon = dt === '小便' ? '💧' : (dt === '大便' ? '💩' : '🧷');
@@ -1951,6 +1989,7 @@ function showDayDiaperDetail(dateStr) {
         '<td style="padding:8px 4px;white-space:nowrap">' + formatTime(r.timestamp) + '</td>' +
         '<td style="padding:8px 4px;font-weight:600;color:var(--pink)">' + icon + ' ' + dt + '</td>' +
         '<td style="padding:8px 4px;color:var(--text-light);font-size:12px">' + (r.note || '') + '</td>' +
+        '<td style="padding:8px 4px;white-space:nowrap"><button class="tl-edit-btn" title="编辑" onclick="showEditRecord(\'' + r.id + '\')">✎</button></td>' +
         '</tr>';
     });
     html += '</tbody></table>';
@@ -2799,6 +2838,9 @@ function deleteFormulaCan(id) {
   saveFormulaCans(cans);
   renderFormulaCans();
   if (currentPage === 'dashboard') renderDashboard();
+  if (document.getElementById('queryDayFormulaPopup') && _queryFormulaDate) {
+    showQueryDayFormulaCans(_queryFormulaDate);
+  }
 }
 
 function renderFormulaCans() {
@@ -2882,6 +2924,9 @@ function queryDayRecords() {
   var milkTotal = 0, mealCount = 0, snackCount = 0, diaperCount = 0, customCount = 0;
   var sleepTotalMs = 0;
 
+  // Formula cans that day (localStorage only)
+  var dayCans = getFormulaCans().filter(function(c) { return c.date.indexOf(selectedDate) === 0; }).length;
+
   matched.forEach(function(r) {
     if (r.type === 'milk') milkTotal += (r.amount || 0);
     else if (r.type === 'meal') mealCount++;
@@ -2932,6 +2977,12 @@ function queryDayRecords() {
       '<div class="value" style="font-size:22px">' + customCount + '<span class="unit">条</span></div>' +
       '<div class="label">📝 其他</div></div>';
 
+    if (dayCans > 0) {
+      html += '<div class="dash-item" style="cursor:pointer" onclick="showQueryDayFormulaCans(\'' + selectedDate + '\')">' +
+        '<div class="value" style="font-size:22px">' + dayCans + '<span class="unit">罐</span></div>' +
+        '<div class="label">📦 奶粉开罐</div></div>';
+    }
+
     html += '</div>';
     html += '<div style="text-align:center;font-size:11px;color:var(--text-light);margin-top:8px">点击卡片查看详情</div>';
   }
@@ -2971,7 +3022,7 @@ function showQueryTypeDetail(dateStr, type) {
     html += '<div style="text-align:center;padding:20px;color:var(--text-light)">暂无' + typeName + '记录</div>';
   } else if (type === 'sleep') {
     html += '<table style="width:100%;font-size:13px;border-collapse:collapse">';
-    html += '<thead><tr style="border-bottom:2px solid #F0E8E8;text-align:left;color:var(--text-light);font-size:11px"><th style="padding:8px 4px">入睡</th><th style="padding:8px 4px">醒来</th><th style="padding:8px 4px">时长</th><th style="padding:8px 4px">备注</th></tr></thead><tbody>';
+    html += '<thead><tr style="border-bottom:2px solid #F0E8E8;text-align:left;color:var(--text-light);font-size:11px"><th style="padding:8px 4px">入睡</th><th style="padding:8px 4px">醒来</th><th style="padding:8px 4px">时长</th><th style="padding:8px 4px">备注</th><th style="padding:8px 4px">操作</th></tr></thead><tbody>';
     dayRecords.forEach(function(r) {
       var dur = (r.sleep_start && r.sleep_end && r.sleep_end > r.sleep_start) ? (r.sleep_end - r.sleep_start) : 0;
       var h = Math.floor(dur / 3600000);
@@ -2981,18 +3032,20 @@ function showQueryTypeDetail(dateStr, type) {
         '<td style="padding:8px 4px;white-space:nowrap">' + (r.sleep_end ? formatTime(r.sleep_end) : '') + '</td>' +
         '<td style="padding:8px 4px;font-weight:600;color:var(--pink)">' + h + 'h' + m + 'm</td>' +
         '<td style="padding:8px 4px;color:var(--text-light);font-size:12px">' + (r.note || '') + '</td>' +
+        '<td style="padding:8px 4px;white-space:nowrap"><button class="tl-edit-btn" title="编辑" onclick="showEditRecord(\'' + r.id + '\')">✎</button></td>' +
         '</tr>';
     });
     html += '</tbody></table>';
   } else {
     html += '<table style="width:100%;font-size:13px;border-collapse:collapse">';
-    html += '<thead><tr style="border-bottom:2px solid #F0E8E8;text-align:left;color:var(--text-light);font-size:11px"><th style="padding:8px 4px">时间</th><th style="padding:8px 4px">内容</th><th style="padding:8px 4px">备注</th></tr></thead><tbody>';
+    html += '<thead><tr style="border-bottom:2px solid #F0E8E8;text-align:left;color:var(--text-light);font-size:11px"><th style="padding:8px 4px">时间</th><th style="padding:8px 4px">内容</th><th style="padding:8px 4px">备注</th><th style="padding:8px 4px">操作</th></tr></thead><tbody>';
     dayRecords.forEach(function(r) {
       var desc = buildRecordDesc(r);
       html += '<tr style="border-bottom:1px solid var(--border)">' +
         '<td style="padding:8px 4px;white-space:nowrap">' + formatTime(r.timestamp) + '</td>' +
         '<td style="padding:8px 4px;font-weight:600;color:var(--pink)">' + desc + '</td>' +
         '<td style="padding:8px 4px;color:var(--text-light);font-size:12px">' + (r.note || '') + '</td>' +
+        '<td style="padding:8px 4px;white-space:nowrap"><button class="tl-edit-btn" title="编辑" onclick="showEditRecord(\'' + r.id + '\')">✎</button></td>' +
         '</tr>';
     });
     html += '</tbody></table>';
@@ -3008,6 +3061,218 @@ function showQueryTypeDetail(dateStr, type) {
 function closeQueryTypeDetail(e) {
   if (e && e.target !== document.getElementById('queryTypeDetailPopup')) return;
   var el = document.getElementById('queryTypeDetailPopup');
+  if (el) el.remove();
+}
+
+// ------- Edit Record -------
+function showEditRecord(id) {
+  var existing = document.getElementById('editRecordPopup');
+  if (existing) existing.remove();
+
+  var records = getRecords();
+  var r = null;
+  for (var i = 0; i < records.length; i++) {
+    if (records[i].id === id) { r = records[i]; break; }
+  }
+  if (!r) { toast('未找到该记录', 'warning'); return; }
+
+  var type = r.type;
+  var fieldsHtml = '';
+
+  function fieldWrap(label, inner) {
+    return '<div style="margin-bottom:10px"><label style="display:block;font-size:12px;color:var(--text-light);margin-bottom:4px;">' + label + '</label>' + inner + '</div>';
+  }
+  function inputStyle() {
+    return 'width:100%;padding:10px;border:2px solid var(--border);border-radius:var(--radius-sm);font-size:14px;outline:none;background:var(--card);color:var(--text);box-sizing:border-box;';
+  }
+
+  if (type === 'milk') {
+    fieldsHtml += fieldWrap('奶量 (ml)', '<input type="number" id="editAmount" min="1" value="' + (r.amount != null ? r.amount : '') + '" style="' + inputStyle() + '">');
+  } else if (type === 'meal' || type === 'snack') {
+    fieldsHtml += fieldWrap('内容', '<input type="text" id="editSubtype" value="' + escapeHtml(r.subtype || '') + '" maxlength="50" style="' + inputStyle() + '">');
+    var portionOpts = ['少', '中', '多'];
+    var portionSel = '';
+    portionOpts.forEach(function(p) {
+      portionSel += '<option value="' + p + '"' + (r.portion === p ? ' selected' : '') + '>' + p + '</option>';
+    });
+    fieldsHtml += fieldWrap('分量（可选）', '<select id="editPortion" style="' + inputStyle() + '"><option value="">不选</option>' + portionSel + '</select>');
+  } else if (type === 'sleep') {
+    fieldsHtml += fieldWrap('入睡时间', '<input type="datetime-local" id="editSleepStart" value="' + (r.sleep_start ? toDatetimeLocal(r.sleep_start) : '') + '" style="' + inputStyle() + '">');
+    fieldsHtml += fieldWrap('醒来时间（正在睡觉可留空）', '<input type="datetime-local" id="editSleepEnd" value="' + (r.sleep_end ? toDatetimeLocal(r.sleep_end) : '') + '" style="' + inputStyle() + '">');
+  } else if (type === 'diaper') {
+    var diaperOptions = ['小便', '大便'];
+    var diaperSel = '';
+    diaperOptions.forEach(function(opt) {
+      diaperSel += '<option value="' + opt + '"' + (r.diaper_type === opt ? ' selected' : '') + '>' + opt + '</option>';
+    });
+    fieldsHtml += fieldWrap('类型', '<select id="editDiaperType" style="' + inputStyle() + '">' + diaperSel + '</select>');
+    fieldsHtml += fieldWrap('备注（可选）', '<input type="text" id="editNote" value="' + escapeHtml(r.note || '') + '" maxlength="50" style="' + inputStyle() + '">');
+  } else if (type === 'height') {
+    fieldsHtml += fieldWrap('身高 (cm)', '<input type="number" id="editMeasure" step="0.1" min="0" value="' + (r.height != null ? r.height : '') + '" style="' + inputStyle() + '">');
+  } else if (type === 'weight') {
+    fieldsHtml += fieldWrap('体重 (斤)', '<input type="number" id="editMeasure" step="0.1" min="0" value="' + (r.weight != null ? r.weight : '') + '" style="' + inputStyle() + '">');
+  } else if (type === 'hw') {
+    fieldsHtml += fieldWrap('身高 (cm)', '<input type="number" id="editHeight" step="0.1" min="0" value="' + (r.height != null ? r.height : '') + '" style="' + inputStyle() + '">');
+    fieldsHtml += fieldWrap('体重 (斤)', '<input type="number" id="editWeight" step="0.1" min="0" value="' + (r.weight != null ? r.weight : '') + '" style="' + inputStyle() + '">');
+  } else if (type === 'custom') {
+    fieldsHtml += fieldWrap('内容', '<input type="text" id="editSubtype" value="' + escapeHtml(r.subtype || '') + '" maxlength="100" style="' + inputStyle() + '">');
+    fieldsHtml += fieldWrap('备注（可选）', '<input type="text" id="editNote" value="' + escapeHtml(r.note || '') + '" maxlength="50" style="' + inputStyle() + '">');
+  } else {
+    // poop 等其它类型仅支持改时间
+  }
+
+  fieldsHtml += fieldWrap('日期时间', '<input type="datetime-local" id="editTimestamp" value="' + toDatetimeLocal(r.timestamp) + '" style="' + inputStyle() + '">');
+
+  var html = '<div class="modal-overlay show" id="editRecordPopup" onclick="closeEditRecord(event)">' +
+    '<div class="modal-box" onclick="event.stopPropagation()">' +
+    '<h3 style="margin-bottom:12px">编辑' + getTypeName(type) + '记录</h3>' +
+    fieldsHtml +
+    '<div class="btn-row" style="margin-top:16px">' +
+    '<button class="btn-confirm" onclick="closeEditRecord()" style="flex:1;padding:10px;border-radius:20px;font-size:14px;border:none;background:var(--bg);color:var(--text);cursor:pointer">取消</button>' +
+    '<button class="btn-confirm" onclick="saveEditRecord(\'' + id + '\')" style="flex:1;padding:10px;border-radius:20px;font-size:14px;border:none;background:var(--pink);color:#fff;cursor:pointer">保存</button>' +
+    '</div></div></div>';
+
+  document.body.insertAdjacentHTML('beforeend', html);
+}
+
+function closeEditRecord(e) {
+  if (e && e.target !== document.getElementById('editRecordPopup')) return;
+  var el = document.getElementById('editRecordPopup');
+  if (el) el.remove();
+}
+
+async function saveEditRecord(id) {
+  var records = getRecords();
+  var idx = -1;
+  for (var i = 0; i < records.length; i++) {
+    if (records[i].id === id) { idx = i; break; }
+  }
+  if (idx < 0) { toast('未找到该记录', 'warning'); return; }
+
+  var src = records[idx];
+  var type = src.type;
+  var updated = {};
+  for (var k in src) updated[k] = src[k];
+
+  function val(elId) {
+    var el = document.getElementById(elId);
+    return el ? el.value : '';
+  }
+
+  // 日期时间（通用）
+  var tsVal = val('editTimestamp');
+  if (tsVal) {
+    var newTs = new Date(tsVal).getTime();
+    if (!isNaN(newTs)) updated.timestamp = newTs;
+  }
+
+  if (type === 'milk') {
+    var amt = parseFloat(val('editAmount'));
+    if (isNaN(amt) || amt <= 0) { toast('请输入有效奶量', 'warning'); return; }
+    updated.amount = amt;
+  } else if (type === 'meal' || type === 'snack') {
+    var sub = val('editSubtype').trim();
+    if (!sub) { toast('请输入内容', 'warning'); return; }
+    updated.subtype = sub;
+    updated.portion = val('editPortion').trim();
+  } else if (type === 'sleep') {
+    var ss = val('editSleepStart');
+    var se = val('editSleepEnd');
+    var ssTs = ss ? new Date(ss).getTime() : NaN;
+    if (isNaN(ssTs)) { toast('请选择入睡时间', 'warning'); return; }
+    updated.sleep_start = ssTs;
+    updated.timestamp = ssTs; // 睡眠记录时间 = 入睡时间
+    if (se) {
+      var seTs = new Date(se).getTime();
+      if (isNaN(seTs)) { toast('醒来时间无效', 'warning'); return; }
+      if (seTs <= ssTs) { toast('醒来时间必须晚于入睡时间', 'warning'); return; }
+      updated.sleep_end = seTs;
+    } else {
+      updated.sleep_end = null;
+    }
+  } else if (type === 'diaper') {
+    var dt = val('editDiaperType');
+    if (!dt) { toast('请选择尿布类型', 'warning'); return; }
+    updated.diaper_type = dt;
+    updated.note = val('editNote').trim();
+  } else if (type === 'height') {
+    var hv = parseFloat(val('editMeasure'));
+    if (isNaN(hv) || hv <= 0) { toast('请输入有效身高', 'warning'); return; }
+    updated.height = hv;
+  } else if (type === 'weight') {
+    var wv = parseFloat(val('editMeasure'));
+    if (isNaN(wv) || wv <= 0) { toast('请输入有效体重', 'warning'); return; }
+    updated.weight = wv;
+  } else if (type === 'hw') {
+    var eh = parseFloat(val('editHeight'));
+    var ew = parseFloat(val('editWeight'));
+    if (!isNaN(eh) && eh > 0) updated.height = eh;
+    if (!isNaN(ew) && ew > 0) updated.weight = ew;
+  } else if (type === 'custom') {
+    var csub = val('editSubtype').trim();
+    if (!csub) { toast('请输入记录内容', 'warning'); return; }
+    updated.subtype = csub;
+    updated.note = val('editNote').trim();
+  }
+
+  var ok = await updateRecord(updated);
+  if (!ok) return;
+
+  // 关闭相关弹窗并重渲染当前页
+  var editEl = document.getElementById('editRecordPopup');
+  if (editEl) editEl.remove();
+  var qdEl = document.getElementById('queryTypeDetailPopup');
+  if (qdEl) qdEl.remove();
+  var tdEl = document.getElementById('todayDetailPopup');
+  if (tdEl) tdEl.remove();
+  var milkEl = document.getElementById('milkDetailPopup');
+  if (milkEl) milkEl.remove();
+  var diaperEl = document.getElementById('diaperDetailPopup');
+  if (diaperEl) diaperEl.remove();
+  var qmOverlay = document.getElementById('queryModalOverlay');
+  if (qmOverlay) qmOverlay.classList.remove('show');
+
+  renderPage(currentPage);
+  toast('记录已更新', 'success');
+}
+
+// ------- Query Day Formula Cans -------
+var _queryFormulaDate = '';
+function showQueryDayFormulaCans(dateStr) {
+  var existing = document.getElementById('queryDayFormulaPopup');
+  if (existing) existing.remove();
+  _queryFormulaDate = dateStr;
+
+  var cans = getFormulaCans().filter(function(c) { return c.date.indexOf(dateStr) === 0; });
+
+  var html = '<div class="modal-overlay show" id="queryDayFormulaPopup" onclick="closeQueryDayFormulaCans(event)">' +
+    '<div class="modal-box" style="max-height:70vh;overflow-y:auto" onclick="event.stopPropagation()">' +
+    '<h3 style="margin-bottom:12px">' + dateStr + ' 奶粉开罐明细</h3>';
+
+  if (cans.length === 0) {
+    html += '<div style="text-align:center;padding:20px;color:var(--text-light)">当日暂无开罐记录</div>';
+  } else {
+    html += '<table style="width:100%;font-size:13px;border-collapse:collapse">' +
+      '<thead><tr style="border-bottom:2px solid #F0E8E8;text-align:left;color:var(--text-light);font-size:11px"><th style="padding:8px 4px">开罐时间</th><th style="padding:8px 4px">操作</th></tr></thead><tbody>';
+    cans.forEach(function(c) {
+      html += '<tr style="border-bottom:1px solid var(--border)">' +
+        '<td style="padding:8px 4px">📦 ' + c.date + '</td>' +
+        '<td style="padding:8px 4px"><button onclick="deleteFormulaCan(\'' + c.id + '\')" style="border:none;background:none;color:#FF6B8A;font-size:14px;cursor:pointer" title="删除">&times;</button></td>' +
+        '</tr>';
+    });
+    html += '</tbody></table>';
+  }
+
+  html += '<div class="btn-row" style="margin-top:16px">' +
+    '<button class="btn-confirm" onclick="document.getElementById(\'queryDayFormulaPopup\').remove()" style="flex:1;padding:10px;border-radius:20px;font-size:14px;border:none;background:var(--pink);color:#fff;cursor:pointer">关闭</button>' +
+    '</div></div></div>';
+
+  document.body.insertAdjacentHTML('beforeend', html);
+}
+
+function closeQueryDayFormulaCans(e) {
+  if (e && e.target !== document.getElementById('queryDayFormulaPopup')) return;
+  var el = document.getElementById('queryDayFormulaPopup');
   if (el) el.remove();
 }
 
