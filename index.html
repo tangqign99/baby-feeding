@@ -638,7 +638,7 @@ body {
     <div class="btn-danger-hint">清空后不可恢复，请谨慎操作</div>
     <button class="btn-danger" onclick="clearAllData()">清空所有数据</button>
     <div style="text-align:center;padding:16px;font-size:12px;color:var(--text-light)">
-      宝宝喂养记录 v3.43 · 数据云端同步 (Supabase)
+      宝宝喂养记录 v3.44 · 数据云端同步 (Supabase)
     </div>
     <!-- Query Record Modal -->
     <div class="query-modal-overlay" id="queryModalOverlay">
@@ -676,11 +676,11 @@ body {
 
 <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-  <script src="./app.js?v=3.43"></script>
+  <script src="./app.js?v=3.44"></script>
   <script>
     // Service Worker 注册
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('./sw.js?v=3.43').then(function(reg) {
+      navigator.serviceWorker.register('./sw.js?v=3.44').then(function(reg) {
         console.log('SW registered:', reg.scope);
       }).catch(function(err) {
         console.log('SW failed:', err);

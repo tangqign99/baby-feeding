@@ -1,5 +1,5 @@
 /* ============================================
-   宝宝喂养记录 PWA - 应用逻辑 v3.43 (Supabase)
+   宝宝喂养记录 PWA - 应用逻辑 v3.44 (Supabase)
    ============================================ */
 
 const FORMULA_COST_PER_30ML = 2.28; // 30ml = 4.2g, 680g = 369元 → 每30ml费用
@@ -1023,6 +1023,7 @@ function renderEntryContent() {
     case 'custom':
       container.innerHTML =
         '<div style="font-size:13px;color:var(--text-light);margin-bottom:6px;">记录内容</div>' +
+        '<div class="preset-grid" id="presetGrid"></div>' +
         '<div class="entry-row">' +
         '<input type="text" id="customContent" placeholder="如：吃药、洗澡、理发等" maxlength="50">' +
         '</div>' +
@@ -1031,6 +1032,7 @@ function renderEntryContent() {
         '</div>' +
         datetimeRowHtml() +
         '<button class="btn-primary" onclick="recordCustom()">记录其他</button>';
+      buildPresetGrid(['理发', '洗澡'], '');
       break;
 
     case 'poop':
@@ -1414,7 +1416,7 @@ async function recordDiaper() {
 // ------- Custom -------
 async function recordCustom() {
   var contentEl = document.getElementById('customContent');
-  var content = contentEl ? contentEl.value.trim() : '';
+  var content = (contentEl ? contentEl.value.trim() : '') || selectedPreset;
   if (!content) { toast('请输入记录内容', 'warning'); return; }
 
   var noteEl = document.getElementById('customNote');
@@ -1907,6 +1909,21 @@ function renderStats() {
   html += '<div class="chart-container">' + whoHead('体重成长曲线 (WHO)') +
     '<canvas id="weightWhoChart" width="320" height="220" style="width:100%;max-width:420px"></canvas>' +
     '<div style="font-size:11px;color:var(--text-light);padding-top:6px">参考：WHO 标准 P3/P50/P97（' + whoGenderLabel + '）· 体重 kg（记录为斤，自动换算）</div></div>';
+
+  // Haircut records
+  var haircutRecords = records.filter(function(r) { return r.type === 'custom' && r.subtype === '理发'; }).sort(function(a, b) { return b.timestamp - a.timestamp; });
+  html += '<div class="chart-container"><div class="chart-title">理发记录</div>';
+  if (haircutRecords.length > 0) {
+    html += '<div style="padding:4px 0">';
+    haircutRecords.forEach(function(r) {
+      var noteHtml = r.note ? ' <span style="font-size:12px;color:var(--text-light)">(' + escapeHtml(r.note) + ')</span>' : '';
+      html += '<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px"><span>' + formatDate(r.timestamp) + ' ' + formatTime(r.timestamp) + '</span><span style="color:var(--text-light);font-size:12px">理发' + noteHtml + '</span></div>';
+    });
+    html += '</div>';
+  } else {
+    html += '<div class="stat-empty">暂无理发记录</div>';
+  }
+  html += '</div>';
 
   container.innerHTML = html;
 
@@ -2941,7 +2958,7 @@ async function clearAllData() {
 function exportBackup() {
   var data = {
     app: 'baby-feeding',
-    version: '3.43',
+    version: '3.44',
     exportedAt: new Date().toISOString(),
     records: getRecords(),
     formulaCans: getFormulaCans()
