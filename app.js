@@ -1,5 +1,5 @@
 /* ============================================
-   宝宝喂养记录 PWA - 应用逻辑 v3.44 (Supabase)
+   宝宝喂养记录 PWA - 应用逻辑 v3.45 (Supabase)
    ============================================ */
 
 const FORMULA_COST_PER_30ML = 2.28; // 30ml = 4.2g, 680g = 369元 → 每30ml费用
@@ -827,38 +827,23 @@ var selectedPreset = '';
 var selectedPortion = '';
 
 function renderEntry() {
-  var tabsRow1 = [
+  var tabs = [
     { id: 'milk', label: '🍼 奶量' },
     { id: 'meal', label: '🍚 吃饭' },
-    { id: 'snack', label: '🥄 辅食' }
-  ];
-  var tabsRow2 = [
+    { id: 'snack', label: '🥄 辅食' },
     { id: 'diaper', label: '🧷 尿布' },
-    { id: 'sleep', label: '💤 睡眠' }
-  ];
-  var tabsRow3 = [
-    { id: 'height', label: '📏 身高' },
-    { id: 'weight', label: '⚖️ 体重' },
+    { id: 'sleep', label: '💤 睡眠' },
     { id: 'custom', label: '📝 其他' }
   ];
-  var allTabs = tabsRow1.concat(tabsRow2).concat(tabsRow3);
 
-  var html = '<div class="tab-bar">';
-  tabsRow1.forEach(function(t) {
-    html += '<button class="tab-btn' + (entryTab === t.id ? ' active' : '') + '" data-tab="' + t.id + '">' + t.label + '</button>';
-  });
-  html += '</div><div class="tab-bar tab-bar-row2">';
-  tabsRow2.forEach(function(t) {
-    html += '<button class="tab-btn' + (entryTab === t.id ? ' active' : '') + '" data-tab="' + t.id + '">' + t.label + '</button>';
-  });
-  html += '</div><div class="tab-bar tab-bar-row3">';
-  tabsRow3.forEach(function(t) {
-    html += '<button class="tab-btn' + (entryTab === t.id ? ' active' : '') + '" data-tab="' + t.id + '">' + t.label + '</button>';
+  var html = '<div class="entry-tab-grid">';
+  tabs.forEach(function(t) {
+    html += '<button class="entry-tab-btn' + (entryTab === t.id ? ' active' : '') + '" data-tab="' + t.id + '">' + t.label + '</button>';
   });
   html += '</div>';
   document.getElementById('entryTabs').innerHTML = html;
 
-  document.querySelectorAll('#entryTabs .tab-btn').forEach(function(btn) {
+  document.querySelectorAll('#entryTabs .entry-tab-btn').forEach(function(btn) {
     btn.addEventListener('click', function() {
       entryTab = btn.dataset.tab;
       selectedPreset = '';
@@ -952,26 +937,6 @@ function renderEntryContent() {
       buildPortionBar();
       break;
 
-    case 'height':
-      container.innerHTML =
-        '<div style="margin-bottom:12px">' +
-        '<label style="display:block;font-size:13px;color:var(--text-light);margin-bottom:4px;">身高 (cm)</label>' +
-        '<input type="number" id="heightInput" placeholder="如 65.5" inputmode="decimal" min="1" max="200" step="0.1" style="width:100%;padding:14px;border:2px solid var(--border);border-radius:var(--radius-sm);font-size:20px;text-align:center;outline:none;background:var(--card);color:var(--text)">' +
-        '</div>' +
-        datetimeRowHtml() +
-        '<button class="btn-primary" onclick="recordHeight()">记录身高</button>';
-      break;
-
-    case 'weight':
-      container.innerHTML =
-        '<div style="margin-bottom:12px">' +
-        '<label style="display:block;font-size:13px;color:var(--text-light);margin-bottom:4px;">体重 (斤)</label>' +
-        '<input type="number" id="weightInput" placeholder="如 7.2" inputmode="decimal" min="0.1" max="100" step="0.1" style="width:100%;padding:14px;border:2px solid var(--border);border-radius:var(--radius-sm);font-size:20px;text-align:center;outline:none;background:var(--card);color:var(--text)">' +
-        '</div>' +
-        datetimeRowHtml() +
-        '<button class="btn-primary" onclick="recordWeight()">记录体重</button>';
-      break;
-
     case 'sleep':
       var activeSleep = getActiveSleep();
       if (activeSleep) {
@@ -1022,7 +987,23 @@ function renderEntryContent() {
 
     case 'custom':
       container.innerHTML =
-        '<div style="font-size:13px;color:var(--text-light);margin-bottom:6px;">记录内容</div>' +
+        '<div style="font-size:13px;color:var(--text-light);margin-bottom:6px;">身高 / 体重</div>' +
+        '<div class="measure-grid">' +
+        '<div class="measure-item">' +
+        '<label>身高 (cm)</label>' +
+        '<input type="number" id="heightInput" placeholder="如 65.5" inputmode="decimal" min="1" max="200" step="0.1">' +
+        '</div>' +
+        '<div class="measure-item">' +
+        '<label>体重 (斤)</label>' +
+        '<input type="number" id="weightInput" placeholder="如 7.2" inputmode="decimal" min="0.1" max="100" step="0.1">' +
+        '</div>' +
+        '</div>' +
+        datetimeRowHtml() +
+        '<div class="btn-row-2">' +
+        '<button class="btn-primary" onclick="recordHeight()">记录身高</button>' +
+        '<button class="btn-primary" onclick="recordWeight()">记录体重</button>' +
+        '</div>' +
+        '<div style="font-size:13px;color:var(--text-light);margin-bottom:6px;margin-top:14px;">其他记录</div>' +
         '<div class="preset-grid" id="presetGrid"></div>' +
         '<div class="entry-row">' +
         '<input type="text" id="customContent" placeholder="如：吃药、洗澡、理发等" maxlength="50">' +
@@ -1030,7 +1011,6 @@ function renderEntryContent() {
         '<div class="entry-row">' +
         '<input type="text" id="customNote" placeholder="备注（可选）" maxlength="50">' +
         '</div>' +
-        datetimeRowHtml() +
         '<button class="btn-primary" onclick="recordCustom()">记录其他</button>';
       buildPresetGrid(['理发', '洗澡'], '');
       break;
@@ -1221,7 +1201,7 @@ async function recordHeight() {
 
   await saveRecord(record);
   toast('记录成功：' + height + 'cm 📏', 'success');
-  entryTab = 'height';
+  entryTab = 'custom';
   selectedPreset = '';
   renderEntry();
   navigateTo('dashboard');
@@ -1241,7 +1221,7 @@ async function recordWeight() {
 
   await saveRecord(record);
   toast('记录成功：' + weight + '斤 ⚖️', 'success');
-  entryTab = 'weight';
+  entryTab = 'custom';
   selectedPreset = '';
   renderEntry();
   navigateTo('dashboard');
@@ -2958,7 +2938,7 @@ async function clearAllData() {
 function exportBackup() {
   var data = {
     app: 'baby-feeding',
-    version: '3.44',
+    version: '3.45',
     exportedAt: new Date().toISOString(),
     records: getRecords(),
     formulaCans: getFormulaCans()

@@ -277,6 +277,35 @@ body {
   font-weight:500;
 }
 .tab-btn.active { background:var(--pink); color:#fff; box-shadow:0 2px 8px rgba(255,154,162,0.4); }
+/* Entry quick tabs: 2x3 grid fixed above bottom nav */
+#entryTabs {
+  position:fixed; left:50%; transform:translateX(-50%);
+  bottom: calc(var(--nav-height) + var(--safe-bottom));
+  max-width:480px; width:100%;
+  background:var(--card); border-top:1px solid var(--border);
+  box-shadow:0 -2px 12px rgba(0,0,0,0.04);
+  z-index:99; padding:8px 10px; box-sizing:border-box;
+}
+#page-entry { padding-bottom: calc(var(--nav-height) + var(--safe-bottom) + 80px); }
+.entry-tab-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; }
+.entry-tab-btn {
+  padding:10px 4px; border:2px solid var(--border); border-radius:12px;
+  background:var(--bg); font-size:13px; color:var(--text); cursor:pointer;
+  font-weight:500; transition:all 0.15s; text-align:center;
+}
+.entry-tab-btn.active { border-color:var(--pink); background:var(--pink-soft); color:var(--pink); }
+/* Measure (height/weight) entry inside custom tab */
+.measure-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px; }
+.measure-item { display:flex; flex-direction:column; gap:6px; }
+.measure-item label { font-size:13px; color:var(--text-light); }
+.measure-item input {
+  width:100%; padding:12px; border:2px solid var(--border); border-radius:var(--radius-sm);
+  font-size:18px; text-align:center; outline:none; background:var(--card); color:var(--text);
+  box-sizing:border-box;
+}
+.measure-item input:focus { border-color:var(--pink); }
+.btn-row-2 { display:flex; gap:8px; margin:4px 0 4px; }
+.btn-row-2 .btn-primary { flex:1; }
 .preset-grid-milk { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin-bottom:10px; }
 .preset-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:10px; }
 .preset-btn {
@@ -638,7 +667,7 @@ body {
     <div class="btn-danger-hint">清空后不可恢复，请谨慎操作</div>
     <button class="btn-danger" onclick="clearAllData()">清空所有数据</button>
     <div style="text-align:center;padding:16px;font-size:12px;color:var(--text-light)">
-      宝宝喂养记录 v3.44 · 数据云端同步 (Supabase)
+      宝宝喂养记录 v3.45 · 数据云端同步 (Supabase)
     </div>
     <!-- Query Record Modal -->
     <div class="query-modal-overlay" id="queryModalOverlay">
@@ -676,11 +705,11 @@ body {
 
 <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-  <script src="./app.js?v=3.44"></script>
+  <script src="./app.js?v=3.45"></script>
   <script>
     // Service Worker 注册
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('./sw.js?v=3.44').then(function(reg) {
+      navigator.serviceWorker.register('./sw.js?v=3.45').then(function(reg) {
         console.log('SW registered:', reg.scope);
       }).catch(function(err) {
         console.log('SW failed:', err);
