@@ -1,5 +1,5 @@
 /* ============================================
-   宝宝喂养记录 PWA - 应用逻辑 v3.45 (Supabase)
+   宝宝喂养记录 PWA - 应用逻辑 v3.46 (Supabase)
    ============================================ */
 
 const FORMULA_COST_PER_30ML = 2.28; // 30ml = 4.2g, 680g = 369元 → 每30ml费用
@@ -483,9 +483,9 @@ function renderDashboard() {
   // Summary: today
   var today = formatDate(Date.now());
   var todayRecords = records.filter(function(r) { return formatDate(r.timestamp) === today; });
-  var totalMilk = 0, mealCount = 0, snackCount = 0, sleepCount = 0, totalSleepMin = 0, poopCount = 0, diaperCount = 0;
+  var totalMilk = 0, mealCount = 0, snackCount = 0, milkCount = 0, sleepCount = 0, totalSleepMin = 0, poopCount = 0, diaperCount = 0;
   todayRecords.forEach(function(r) {
-    if (r.type === 'milk') totalMilk += (r.amount || 0);
+    if (r.type === 'milk') { totalMilk += (r.amount || 0); milkCount += 1; }
     if (r.type === 'meal') mealCount += 1;
     if (r.type === 'snack') snackCount += 1;
     if (r.type === 'sleep') {
@@ -497,7 +497,7 @@ function renderDashboard() {
   });
   var sleepStr = sleepCount > 0 ? Math.floor(totalSleepMin / 60) + 'h' + (totalSleepMin % 60) + 'm' : '--';
 
-  var foodTotal = mealCount + snackCount;
+  var foodTotal = mealCount + snackCount + milkCount;
 
   document.getElementById('dashSummary').innerHTML =
     '<div class="dash-milk-hero" style="cursor:pointer" onclick="showTodayDetail(\'milk\')"><div class="hero-value">' + totalMilk + '<span class="unit">ml</span></div><div class="label">今日奶量</div></div>' +
@@ -530,9 +530,9 @@ function renderDashboard() {
     timerSleep.style.cursor = '';
   }
 
-  // Last feeding (milk only)
+  // Last feeding (milk/meal/snack)
   var timerFeedingEl = document.getElementById('timerFeeding');
-  var feedingRecords = records.filter(function(r) { return r.type === 'milk'; });
+  var feedingRecords = records.filter(function(r) { return r.type === 'milk' || r.type === 'meal' || r.type === 'snack'; });
   feedingRecords.sort(function(a, b) { return b.timestamp - a.timestamp; });
   var lastFeeding = feedingRecords[0];
 
@@ -542,14 +542,14 @@ function renderDashboard() {
     var m = Math.floor((diff % 3600000) / 60000);
     var detail = lastFeeding.type === 'milk' ? lastFeeding.amount + 'ml' : (lastFeeding.subtype || getTypeName(lastFeeding.type));
     timerFeedingEl.innerHTML =
-      '<div class="timer-label">距上次喝奶</div>' +
+      '<div class="timer-label">距上次进食</div>' +
       '<div class="timer-value" id="timerFeedingValue">' + h + '小时' + m + '分钟</div>' +
       '<div class="timer-detail">' + detail + ' · ' + formatTime(lastFeeding.timestamp) + '</div>';
     timerFeedingEl.style.cursor = 'pointer';
     timerFeedingEl.onclick = function() { switchTab('milk'); };
   } else {
     timerFeedingEl.innerHTML =
-      '<div class="timer-label">距上次喝奶</div>' +
+      '<div class="timer-label">距上次进食</div>' +
       '<div class="timer-value">--</div>' +
       '<div class="timer-detail">暂无记录</div>';
     timerFeedingEl.style.cursor = 'pointer';
@@ -720,6 +720,10 @@ function endActiveSleep() {
     '<div style="text-align:center;padding:16px 0">' +
     '<div style="font-size:42px;font-weight:700;color:var(--pink);margin-bottom:8px">' + sh + '小时' + sm + '分钟</div>' +
     '<div style="font-size:13px;color:var(--text-light);margin-bottom:16px">入睡于 ' + formatTime(activeSleep.sleep_start) + '</div>' +
+    '<div style="margin-bottom:12px">' +
+    '<label style="display:block;font-size:12px;color:var(--text-light);margin-bottom:4px;">醒来时间（可选）</label>' +
+    '<input type="datetime-local" id="sleepEndTime" value="' + toDatetimeLocal(Date.now()) + '" style="width:100%;max-width:260px;padding:12px;border:2px solid var(--border);border-radius:var(--radius-sm);font-size:15px;outline:none;background:var(--card);color:var(--text);text-align:center;">' +
+    '</div>' +
     '<button class="btn-primary" onclick="confirmSleepEnd()" style="margin-bottom:10px">宝宝醒了</button>' +
     '<br><button onclick="document.getElementById(\'sleepEndPopup\').remove()" style="border:none;background:none;color:var(--text-light);font-size:13px;padding:8px;cursor:pointer">取消</button>' +
     '</div></div></div>';
@@ -736,7 +740,14 @@ async function confirmSleepEnd() {
   var activeSleep = getActiveSleep();
   if (!activeSleep) return;
 
+  var endEl = document.getElementById('sleepEndTime');
   var now = Date.now();
+  if (endEl && endEl.value) {
+    var customTs = new Date(endEl.value).getTime();
+    if (!isNaN(customTs) && customTs > activeSleep.sleep_start) {
+      now = customTs;
+    }
+  }
   var dur = now - activeSleep.sleep_start;
   var sh = Math.floor(dur / 3600000);
   var sm = Math.floor((dur % 3600000) / 60000);
@@ -1742,40 +1753,6 @@ function renderStats() {
   }
   html += '</div>';
 
-  // ---------- Formula cost: monthly trend (last 6 months, per can ¥369) ----------
-  var now = new Date();
-  var allCans = getFormulaCans();
-  var monthly = [];
-  for (var mi = 5; mi >= 0; mi--) {
-    var md = new Date(now.getFullYear(), now.getMonth() - mi, 1);
-    var my = md.getFullYear();
-    var mo = md.getMonth() + 1;
-    var prefix = my + '-' + mo.toString().padStart(2, '0');
-    var cnt = allCans.filter(function(c) { return c.date.indexOf(prefix) === 0; }).length;
-    monthly.push({ key: prefix, month: mo, monthLabel: mo + '月', count: cnt, cost: cnt * 369, isCurrent: (mo === now.getMonth() + 1 && my === now.getFullYear()) });
-  }
-  var hasAnyFormula = monthly.some(function(m) { return m.count > 0; });
-  window._formulaMonthlyData = monthly;
-
-  html += '<div class="chart-container"><div class="chart-title">奶粉费用月度趋势</div>';
-  html += '<div style="text-align:center;font-size:11px;color:var(--text-light);margin-bottom:6px">按开罐数 × ¥369/罐（680g）计算</div>';
-  if (hasAnyFormula) {
-    html += '<canvas id="formulaMonthlyChart" width="320" height="180" style="width:100%;max-width:420px"></canvas>';
-    html += '<div style="margin-top:10px">';
-    monthly.forEach(function(m) {
-      html += '<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px">' +
-        '<span>' + m.monthLabel + (m.isCurrent ? '（本月）' : '') + '</span>' +
-        '<span style="font-weight:600">' + m.count + '罐 · <span style="color:var(--pink)">¥' + m.cost + '</span></span></div>';
-    });
-    html += '</div>';
-    if (monthly[monthly.length - 1].count === 0) {
-      html += '<div style="text-align:center;font-size:11px;color:var(--text-light);margin-top:6px">本月暂未开罐，费用为 0</div>';
-    }
-  } else {
-    html += '<div class="stat-empty">暂无开罐记录</div>';
-  }
-  html += '</div>';
-
   // ---------- Formula cost: daily cost within selected range ----------
   var formulaCostByDay = {};
   var formulaDateSet = {};
@@ -1892,12 +1869,31 @@ function renderStats() {
 
   // Haircut records
   var haircutRecords = records.filter(function(r) { return r.type === 'custom' && r.subtype === '理发'; }).sort(function(a, b) { return b.timestamp - a.timestamp; });
-  html += '<div class="chart-container"><div class="chart-title">理发记录</div>';
+  html += '<div class="chart-container"><div class="chart-title">✂️ 理发记录</div>';
   if (haircutRecords.length > 0) {
     html += '<div style="padding:4px 0">';
-    haircutRecords.forEach(function(r) {
-      var noteHtml = r.note ? ' <span style="font-size:12px;color:var(--text-light)">(' + escapeHtml(r.note) + ')</span>' : '';
-      html += '<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px"><span>' + formatDate(r.timestamp) + ' ' + formatTime(r.timestamp) + '</span><span style="color:var(--text-light);font-size:12px">理发' + noteHtml + '</span></div>';
+    var todayKey = formatDate(Date.now());
+    haircutRecords.forEach(function(r, idx) {
+      var num = haircutRecords.length - idx;
+      var diff = Date.now() - r.timestamp;
+      var relTime;
+      if (diff < 3600000) {
+        relTime = Math.max(1, Math.floor(diff / 60000)) + '分钟前';
+      } else if (diff < 86400000) {
+        relTime = Math.floor(diff / 3600000) + '小时前';
+      } else if (diff < 172800000) {
+        relTime = '昨天';
+      } else {
+        relTime = Math.floor(diff / 86400000) + '天前';
+      }
+      if (formatDate(r.timestamp) === todayKey) relTime = '今天';
+      var noteHtml = r.note ? '<div style="font-size:12px;color:var(--text-light);margin-top:2px">' + escapeHtml(r.note) + '</div>' : '';
+      html += '<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)">' +
+        '<div style="width:30px;height:30px;border-radius:50%;background:var(--pink);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0">' + num + '</div>' +
+        '<div style="flex:1;min-width:0">' +
+        '<div style="font-size:13px;font-weight:600">第' + num + '次理发 <span style="font-size:12px;color:var(--pink);font-weight:500">' + relTime + '</span></div>' +
+        '<div style="font-size:12px;color:var(--text-light)">' + formatDate(r.timestamp) + ' ' + formatTime(r.timestamp) + '</div>' + noteHtml +
+        '</div></div>';
     });
     html += '</div>';
   } else {
@@ -1910,7 +1906,6 @@ function renderStats() {
   if (hasMilk) drawMilkChart(days, milkValues, maxMilk);
   if (window._diaperChartData) drawDiaperChart(window._diaperChartData);
   if (window._formulaCostChartData) drawFormulaCostChart(window._formulaCostChartData);
-  if (window._formulaMonthlyData) drawFormulaMonthlyChart();
   if (window._sleepChartData) drawSleepChart(window._sleepChartData);
   if (heightData.length >= 2) drawSingleMetricChart('heightChart', heightData, 'height', '#FF6B8A', '身高(cm)');
   if (weightData.length >= 2) drawSingleMetricChart('weightChart', weightData, 'weight', '#5BA4CF', '体重(斤)');
@@ -3159,7 +3154,7 @@ function updateTimer() {
   // Update feeding timer
   var timerFeedingVal = document.getElementById('timerFeedingValue');
   if (timerFeedingVal) {
-    var feedingRecords = records.filter(function(r) { return r.type === 'milk'; });
+    var feedingRecords = records.filter(function(r) { return r.type === 'milk' || r.type === 'meal' || r.type === 'snack'; });
     feedingRecords.sort(function(a, b) { return b.timestamp - a.timestamp; });
     var last = feedingRecords[0];
     if (last) {
@@ -3171,81 +3166,7 @@ function updateTimer() {
   }
 }
 
-// ------- Service Worker -------
-function drawFormulaMonthlyChart() {
-  var canvas = document.getElementById('formulaMonthlyChart');
-  if (!canvas) return;
-  var ctx = canvas.getContext('2d');
-  var dpr = window.devicePixelRatio || 1;
-  var rect = canvas.getBoundingClientRect();
-  canvas.width = rect.width * dpr;
-  canvas.height = 180 * dpr;
-  ctx.scale(dpr, dpr);
-  canvas.style.height = '180px';
 
-  var w = rect.width;
-  var h = 180;
-  var pad = { top: 16, right: 12, bottom: 28, left: 48 };
-  var cw = w - pad.left - pad.right;
-  var ch = h - pad.top - pad.bottom;
-
-  var data = window._formulaMonthlyData || [];
-  if (data.length === 0) return;
-  var maxCost = 1;
-  data.forEach(function(m) { if (m.cost > maxCost) maxCost = m.cost; });
-
-  var barW = Math.max(14, Math.min(40, cw / data.length * 0.55));
-  var gap = (cw - barW * data.length) / (data.length + 1);
-
-  ctx.clearRect(0, 0, w, h);
-
-  ctx.strokeStyle = getChartTheme().grid;
-  ctx.lineWidth = 1;
-  var gridLines = 4;
-  for (var i = 0; i <= gridLines; i++) {
-    var y = pad.top + (ch / gridLines) * i;
-    ctx.beginPath();
-    ctx.moveTo(pad.left, y);
-    ctx.lineTo(w - pad.right, y);
-    ctx.stroke();
-    ctx.fillStyle = getChartTheme().axis;
-    ctx.font = '11px sans-serif';
-    ctx.textAlign = 'right';
-    ctx.fillText('¥' + Math.round(maxCost / gridLines * (gridLines - i)), pad.left - 6, y + 4);
-  }
-
-  data.forEach(function(m, idx) {
-    var val = m.cost;
-    var barH = val / maxCost * ch;
-    var x = pad.left + gap + idx * (barW + gap);
-    var y = pad.top + ch - barH;
-
-    var gradient = ctx.createLinearGradient(x, y, x, pad.top + ch);
-    if (m.isCurrent) {
-      gradient.addColorStop(0, '#FF6B8A');
-      gradient.addColorStop(1, '#FF9AA2');
-    } else {
-      gradient.addColorStop(0, '#FF9AA2');
-      gradient.addColorStop(1, '#FFB7B2');
-    }
-    ctx.fillStyle = gradient;
-    ctx.beginPath();
-    ctx.roundRect(x, y, barW, barH, [4, 4, 0, 0]);
-    ctx.fill();
-
-    if (val > 0) {
-      ctx.fillStyle = getChartTheme().title;
-      ctx.font = '10px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('¥' + Math.round(val), x + barW / 2, y - 4);
-    }
-
-    ctx.fillStyle = getChartTheme().axis;
-    ctx.font = '10px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText(m.monthLabel, x + barW / 2, pad.top + ch + 18);
-  });
-}
 
 function drawFormulaCostChart(chartData) {
   var canvas = document.getElementById('formulaCostChart');
@@ -3427,9 +3348,45 @@ function formatDateTimeMinute(ts) {
   return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
 }
 
-function addFormulaCan() {
+function promptFormulaCanTime() {
+  var existing = document.getElementById('formulaCanTimePopup');
+  if (existing) existing.remove();
+  var html = '<div class="modal-overlay show" id="formulaCanTimePopup" onclick="closeFormulaCanTimePopup(event)">' +
+    '<div class="modal-box" onclick="event.stopPropagation()">' +
+    '<h3 style="margin-bottom:8px">记录开启一罐新奶粉</h3>' +
+    '<div style="text-align:center;padding:16px 0">' +
+    '<div style="margin-bottom:12px">' +
+    '<label style="display:block;font-size:12px;color:var(--text-light);margin-bottom:4px;">开启时间</label>' +
+    '<input type="datetime-local" id="formulaCanTime" value="' + toDatetimeLocal(Date.now()) + '" style="width:100%;max-width:260px;padding:12px;border:2px solid var(--border);border-radius:var(--radius-sm);font-size:15px;outline:none;background:var(--card);color:var(--text);text-align:center;">' +
+    '</div>' +
+    '<button class="btn-primary" onclick="confirmAddFormulaCan()" style="margin-bottom:10px">确认开罐</button>' +
+    '<br><button onclick="document.getElementById(\'formulaCanTimePopup\').remove()" style="border:none;background:none;color:var(--text-light);font-size:13px;padding:8px;cursor:pointer">取消</button>' +
+    '</div></div></div>';
+  document.body.insertAdjacentHTML('beforeend', html);
+}
+
+function closeFormulaCanTimePopup(e) {
+  if (e && e.target !== document.getElementById('formulaCanTimePopup')) return;
+  var el = document.getElementById('formulaCanTimePopup');
+  if (el) el.remove();
+}
+
+function confirmAddFormulaCan() {
+  var el = document.getElementById('formulaCanTime');
+  var ts = Date.now();
+  if (el && el.value) {
+    var customTs = new Date(el.value).getTime();
+    if (!isNaN(customTs)) ts = customTs;
+  }
+  var popup = document.getElementById('formulaCanTimePopup');
+  if (popup) popup.remove();
+  addFormulaCan(ts);
+}
+
+function addFormulaCan(ts) {
   var cans = getFormulaCans();
-  var rec = { date: formatDateTimeMinute(Date.now()), ts: Date.now(), id: Date.now().toString(36) + Math.random().toString(36).slice(2, 7) };
+  var useTs = (typeof ts === 'number' && !isNaN(ts)) ? ts : Date.now();
+  var rec = { date: formatDateTimeMinute(useTs), ts: useTs, id: Date.now().toString(36) + Math.random().toString(36).slice(2, 7) };
   cans.unshift(rec);
   saveFormulaCans(cans);
   renderFormulaCans();
