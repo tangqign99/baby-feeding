@@ -1,5 +1,5 @@
 /* ============================================
-   宝宝喂养记录 PWA - 应用逻辑 v3.46 (Supabase)
+   宝宝喂养记录 PWA - 应用逻辑 v3.47 (Supabase)
    ============================================ */
 
 const FORMULA_COST_PER_30ML = 2.28; // 30ml = 4.2g, 680g = 369元 → 每30ml费用
@@ -500,9 +500,9 @@ function renderDashboard() {
   var foodTotal = mealCount + snackCount + milkCount;
 
   document.getElementById('dashSummary').innerHTML =
-    '<div class="dash-milk-hero" style="cursor:pointer" onclick="showTodayDetail(\'milk\')"><div class="hero-value">' + totalMilk + '<span class="unit">ml</span></div><div class="label">今日奶量</div></div>' +
+    '<div class="dash-milk-hero" style="cursor:pointer" onclick="showTodayDetail(\'meal\')"><div class="hero-value">' + foodTotal + '<span class="unit">次</span></div><div class="label">进食</div></div>' +
     '<div class="dash-sub-row" style="grid-template-columns:repeat(3,1fr)">' +
-    '<div class="dash-item" style="cursor:pointer" onclick="showTodayDetail(\'meal\')"><div class="value">' + foodTotal + '<span class="unit">次</span></div><div class="label">进食</div></div>' +
+    '<div class="dash-item" style="cursor:pointer" onclick="showTodayDetail(\'milk\')"><div class="value">' + totalMilk + '<span class="unit">ml</span></div><div class="label">今日奶量</div></div>' +
     '<div class="dash-item" style="cursor:pointer" onclick="showTodayDetail(\'sleep\')"><div class="value">' + sleepStr + '</div><div class="label">睡眠</div></div>' +
     '<div class="dash-item" style="cursor:pointer" onclick="showTodayDetail(\'diaper\')"><div class="value">' + diaperCount + '<span class="unit">次</span></div><div class="label">尿布</div></div>' +
     '</div>';
@@ -634,13 +634,13 @@ function showTodayDetail(type) {
 
   var today = formatDate(Date.now());
   var records = getRecords();
-  var typeNames = { milk: '奶量', meal: '吃饭', snack: '辅食', sleep: '睡眠', diaper: '尿布', custom: '其他' };
+  var typeNames = { milk: '奶量', meal: '进食', snack: '辅食', sleep: '睡眠', diaper: '尿布', custom: '其他' };
   var typeName = typeNames[type] || getTypeName(type);
 
   var dayRecords;
   if (type === 'meal') {
     dayRecords = records.filter(function(r) {
-      return (r.type === 'meal' || r.type === 'snack') && formatDate(r.timestamp) === today;
+      return (r.type === 'milk' || r.type === 'meal' || r.type === 'snack') && formatDate(r.timestamp) === today;
     }).sort(function(a, b) { return a.timestamp - b.timestamp; });
   } else {
     dayRecords = records.filter(function(r) {
